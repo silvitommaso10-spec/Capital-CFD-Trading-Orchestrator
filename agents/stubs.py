@@ -5,7 +5,8 @@ milestones. Each returns a neutral signal for now. They are analysis-only and
 cannot execute trades.
 
 The Technical Analysis Agent is fully implemented in
-:mod:`agents.technical_analysis`.
+:mod:`agents.technical_analysis`; the Market Data Agent in
+:mod:`agents.market_data`.
 """
 
 from __future__ import annotations
@@ -13,15 +14,6 @@ from __future__ import annotations
 from typing import Any
 
 from .base import BaseAgent, Signal
-
-
-class MarketDataAgent(BaseAgent):
-    """Prices, candles, spread, volume, timestamps and data-quality flags."""
-
-    name = "market_data"
-
-    def analyze(self, context: dict[str, Any]) -> Signal:
-        return Signal(self.name, 0.5, "stub: market data quality")
 
 
 class NewsMacroAgent(BaseAgent):

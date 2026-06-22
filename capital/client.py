@@ -18,6 +18,7 @@ from app.errors import (
     MarketNotFoundError,
     SessionExpiredError,
 )
+from agents.candles import Candle
 from app.logging_utils import get_logger
 from .auth import CapitalSession, create_session
 from .models import Account, MarketDetails, MarketSummary, Price
@@ -148,6 +149,40 @@ class CapitalClient:
             )
         return prices
 
+    def get_candles(
+        self, epic: str, resolution: str = "MINUTE_15", max_points: int = 200
+    ) -> list[Candle]:
+        """Return OHLCV candles for ``epic`` (mid prices). Read-only.
+
+        ``resolution`` follows the Capital.com convention (e.g. ``MINUTE_15``,
+        ``HOUR``).
+        """
+
+        resp = self._get(
+            f"/api/v1/prices/{epic}",
+            params={"resolution": resolution, "max": max_points},
+        )
+        body = resp.json_body or {}
+        candles: list[Candle] = []
+        for point in body.get("prices", []):
+            o = _mid(point.get("openPrice"))
+            h = _mid(point.get("highPrice"))
+            low = _mid(point.get("lowPrice"))
+            c = _mid(point.get("closePrice"))
+            if None in (o, h, low, c):
+                continue
+            candles.append(
+                Candle(
+                    timestamp=_parse_timestamp(point.get("snapshotTime")),
+                    open=o,  # type: ignore[arg-type]
+                    high=h,  # type: ignore[arg-type]
+                    low=low,  # type: ignore[arg-type]
+                    close=c,  # type: ignore[arg-type]
+                    volume=float(point.get("lastTradedVolume", 0.0) or 0.0),
+                )
+            )
+        return candles
+
     # -- trading is disabled ----------------------------------------------
 
     def place_order(self, *args: Any, **kwargs: Any) -> None:
@@ -162,6 +197,18 @@ class CapitalClient:
     create_position = place_order
     close_position = place_order
     update_position = place_order
+
+
+def _mid(price_obj: Any) -> float | None:
+    """Mid of a Capital.com ``{bid, ask}`` price object."""
+
+    if not isinstance(price_obj, dict):
+        return None
+    bid = price_obj.get("bid")
+    ask = price_obj.get("ask", price_obj.get("offer"))
+    if bid is None or ask is None:
+        return None
+    return (float(bid) + float(ask)) / 2.0
 
 
 def _parse_timestamp(value: Any) -> datetime:

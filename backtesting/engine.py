@@ -18,8 +18,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Sequence
 
+from typing import TYPE_CHECKING
+
 from agents.candles import Candle
 from agents.decision_agent import DecisionAgent
+
+if TYPE_CHECKING:
+    from agents.market_data import MarketDataAgent
 from app.config import AppConfig
 from app.modes import OperatingMode
 from app.orchestrator import MarketSnapshot, Orchestrator, PipelineState
@@ -86,6 +91,23 @@ class BacktestEngine:
     decision_agent: DecisionAgent | None = None
     # How many recent bars to feed the indicators each step.
     window: int = 250
+
+    def run_from_data_agent(
+        self,
+        symbol: str,
+        data_agent: "MarketDataAgent",
+        points_1h: int = 300,
+        points_15m: int = 300,
+    ) -> BacktestResult:
+        """Fetch candles via the Market Data Agent and run the backtest.
+
+        This is the real-data path: the agent pulls OHLCV candles from the
+        read-only Capital.com client. Read-only — no orders are sent.
+        """
+
+        candles_1h = data_agent.candles(symbol, "1H", points_1h)
+        candles_15m = data_agent.candles(symbol, "15m", points_15m)
+        return self.run(symbol, candles_1h, candles_15m)
 
     def run(
         self,

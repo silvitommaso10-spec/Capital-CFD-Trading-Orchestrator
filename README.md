@@ -17,6 +17,9 @@ Implemented:
   read-only price WebSocket.
 - Deterministic **Risk Engine** and risk-first **Margin Calculator**.
 - **Paper CFD simulator** for BACKTEST/SHADOW modes.
+- **Market Data Agent** — OHLCV candles (broker history or tick aggregation),
+  spread/volume, and data-quality flags (stale / high-spread) for the Risk
+  Engine and pipeline.
 - **Technical Analysis Agent** — multi-timeframe (1H trend + 15m setup) using
   EMA/RSI/MACD/ATR, with ATR-based stop/target and `technical/trend/volume`
   scores.

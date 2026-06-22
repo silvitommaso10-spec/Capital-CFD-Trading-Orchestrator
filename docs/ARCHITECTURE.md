@@ -36,6 +36,9 @@ Agents are **pure analysis** — they emit a bounded `Signal` (score in `[0,1]`
 plus rationale/metadata) and **cannot execute trades**.
 
 1. **Market Data Agent** — prices, candles, spread, volume, timestamps, data quality.
+   Implemented in `agents/market_data.py`: OHLCV candles from the read-only
+   client or from tick aggregation (`CandleAggregator`), plus a `MarketQuality`
+   assessment (stale / high-spread flags) consumed by the Risk Engine.
 2. **Technical Analysis Agent** — 1H trend, 15m setups, S/R, breakouts/pullbacks, volume, RSI/MACD/EMA/ATR, stop loss and technical targets.
 3. **News Macro Agent** — macro news, central banks, inflation, rates, employment, oil, geopolitics, crypto/SEC.
 4. **Social Sentiment Agent** — social sentiment (esp. BTC). Weak signal only; cannot open a trade by itself.
