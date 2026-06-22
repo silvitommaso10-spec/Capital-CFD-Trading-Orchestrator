@@ -1,0 +1,69 @@
+# Instrument universe and symbol mapping.
+#
+# `symbol` is the logical name used throughout the orchestrator.
+# `epic` is the Capital.com market identifier (read at runtime via market
+# search; the value here is the expected default and is validated against the
+# broker during the read-only milestone).
+# `bucket` assigns the instrument to a correlation/risk bucket.
+
+instruments:
+  - symbol: US500
+    name: "US 500 (S&P 500)"
+    epic: "US500"
+    bucket: equity_indices
+    quote_currency: USD
+    # Contract size: value of 1.0 unit move in quote currency per 1 contract.
+    contract_size: 1.0
+    min_deal_size: 0.1
+    margin_factor: 0.05        # 5% -> ~20:1
+    max_spread: 1.5
+
+  - symbol: NASDAQ
+    name: "US Tech 100 (Nasdaq)"
+    epic: "US100"
+    bucket: equity_indices
+    quote_currency: USD
+    contract_size: 1.0
+    min_deal_size: 0.1
+    margin_factor: 0.05
+    max_spread: 2.0
+
+  - symbol: GOLD
+    name: "Gold"
+    epic: "GOLD"
+    bucket: metals
+    quote_currency: USD
+    contract_size: 1.0
+    min_deal_size: 0.01
+    margin_factor: 0.05
+    max_spread: 0.6
+
+  - symbol: USOIL
+    name: "Crude Oil WTI"
+    epic: "OIL_CRUDE"
+    bucket: energy
+    quote_currency: USD
+    contract_size: 1.0
+    min_deal_size: 0.1
+    margin_factor: 0.10
+    max_spread: 0.05
+
+  - symbol: BTC
+    name: "Bitcoin"
+    epic: "BTCUSD"
+    bucket: crypto
+    quote_currency: USD
+    contract_size: 1.0
+    min_deal_size: 0.001
+    margin_factor: 0.50        # crypto requires much higher margin
+    max_spread: 40.0
+
+buckets:
+  equity_indices:
+    description: "Broad equity index CFDs (US500, NASDAQ)"
+  metals:
+    description: "Precious metals (GOLD)"
+  energy:
+    description: "Energy commodities (USOIL)"
+  crypto:
+    description: "Crypto CFDs (BTC)"

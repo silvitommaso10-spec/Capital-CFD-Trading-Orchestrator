@@ -1,0 +1,34 @@
+# News / macro configuration.
+#
+# In the read-only milestone these settings only describe how the News Macro
+# Agent classifies events. No external news provider credentials live here;
+# any future API keys must come from environment variables.
+
+news:
+  # A trade is blocked while there is unconfirmed, conflicting news for the
+  # instrument's bucket within this look-back window.
+  conflict_lookback_minutes: 120
+
+  # High-impact economic events: opening new trades is paused around them.
+  high_impact_blackout_minutes_before: 15
+  high_impact_blackout_minutes_after: 15
+
+  # Macro event categories tracked by the News Macro Agent.
+  tracked_categories:
+    - central_bank        # FOMC, ECB, BoE, etc.
+    - inflation           # CPI, PCE, PPI
+    - rates               # rate decisions
+    - employment          # NFP, unemployment, claims
+    - energy_inventories  # EIA / API crude oil inventories
+    - geopolitics
+    - crypto_regulation   # SEC communications, crypto-specific news
+
+  # Map macro categories to the buckets they most affect (used for filtering).
+  category_bucket_impact:
+    central_bank: [equity_indices, metals, crypto]
+    inflation: [equity_indices, metals]
+    rates: [equity_indices, metals, crypto]
+    employment: [equity_indices]
+    energy_inventories: [energy]
+    geopolitics: [energy, metals]
+    crypto_regulation: [crypto]

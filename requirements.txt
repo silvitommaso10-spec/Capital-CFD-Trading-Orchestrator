@@ -1,0 +1,7 @@
+# Runtime dependencies for the read-only milestone.
+PyYAML>=6.0
+requests>=2.31
+websocket-client>=1.6
+
+# Development / test dependencies.
+pytest>=7.4

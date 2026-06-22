@@ -1,0 +1,38 @@
+# Risk policy configuration.
+# These values are consumed by the deterministic Risk Engine.
+# See docs/RISK_POLICY.md for the rationale behind each limit.
+
+risk:
+  # Per-trade risk as a fraction of current equity.
+  default_risk_per_trade: 0.0075   # 0.75%
+  max_risk_per_trade: 0.01         # 1.00% absolute ceiling
+
+  # Daily loss controls, expressed as a fraction of the day's starting equity.
+  daily_soft_stop: 0.03            # 3%  -> reduce exposure / no new risk-on trades
+  daily_hard_stop: 0.05            # 5%  -> stop opening new positions for the day
+  emergency_kill_switch: 0.10      # 10% -> flatten everything, halt the system
+
+  # Concurrency limits.
+  max_open_positions: 3
+  max_positions_per_bucket: 1
+
+  # Trade quality gate.
+  min_reward_risk: 1.8
+
+  # Hard requirements: a trade is rejected if any of these is violated.
+  require_stop_loss: true
+  block_on_stale_data: true
+  block_on_high_spread: true
+  block_on_insufficient_margin: true
+  block_on_unconfirmed_conflicting_news: true
+  block_if_audit_log_fails: true
+
+  # Data quality thresholds.
+  max_data_age_seconds: 30
+  # Per-bucket maximum spread (in instrument price units) tolerated before a
+  # trade is blocked. Overridable per instrument in instruments.yaml.
+  max_spread:
+    equity_indices: 1.5
+    metals: 0.6
+    energy: 0.05
+    crypto: 40.0
