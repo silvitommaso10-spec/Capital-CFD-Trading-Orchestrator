@@ -3,6 +3,9 @@
 These define the contracts for agents that will be implemented in later
 milestones. Each returns a neutral signal for now. They are analysis-only and
 cannot execute trades.
+
+The Technical Analysis Agent is fully implemented in
+:mod:`agents.technical_analysis`.
 """
 
 from __future__ import annotations
@@ -19,15 +22,6 @@ class MarketDataAgent(BaseAgent):
 
     def analyze(self, context: dict[str, Any]) -> Signal:
         return Signal(self.name, 0.5, "stub: market data quality")
-
-
-class TechnicalAnalysisAgent(BaseAgent):
-    """1H trend, 15m setups, S/R, breakouts, RSI/MACD/EMA/ATR, stops/targets."""
-
-    name = "technical_analysis"
-
-    def analyze(self, context: dict[str, Any]) -> Signal:
-        return Signal(self.name, 0.5, "stub: technical analysis")
 
 
 class NewsMacroAgent(BaseAgent):

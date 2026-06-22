@@ -17,6 +17,9 @@ Implemented:
   read-only price WebSocket.
 - Deterministic **Risk Engine** and risk-first **Margin Calculator**.
 - **Paper CFD simulator** for BACKTEST/SHADOW modes.
+- **Technical Analysis Agent** — multi-timeframe (1H trend + 15m setup) using
+  EMA/RSI/MACD/ATR, with ATR-based stop/target and `technical/trend/volume`
+  scores.
 - **Decision Agent** implementing the multi-confirmation scoring/decision rules.
 - **Order Manager** safety boundary (only authorized order path; sends nothing
   to the broker in this version).
