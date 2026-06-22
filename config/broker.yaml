@@ -1,0 +1,40 @@
+# Broker configuration for the Capital CFD Trading Orchestrator.
+#
+# NOTE: This file MUST NOT contain any secret (API key, password, token).
+# Credentials are loaded exclusively from environment variables.
+# See .env.example and docs/CAPITAL_COM_INTEGRATION.md.
+
+broker:
+  name: capital_com
+  product: CFD
+
+  # Operating mode controls how the orchestrator behaves.
+  # Allowed: BACKTEST | SHADOW | CAPITAL_DEMO | LIVE_DISABLED
+  # The default is intentionally never LIVE.
+  mode: CAPITAL_DEMO
+
+  # Live trading is hard-disabled in this version. Flipping this flag is NOT
+  # sufficient to enable live trading; the code refuses live execution
+  # regardless of configuration in the first version.
+  live_trading_enabled: false
+
+  # Capital.com demo REST + streaming endpoints.
+  endpoints:
+    rest_base_url: "https://demo-api-capital.backend-capital.com"
+    ws_base_url: "wss://api-streaming-capital.backend-capital.com/connect"
+
+  # Names of the environment variables that hold the credentials.
+  # The values themselves are NEVER stored here.
+  credentials_env:
+    api_key_var: "CAPITAL_API_KEY"
+    identifier_var: "CAPITAL_IDENTIFIER"
+    password_var: "CAPITAL_API_PASSWORD"
+
+  http:
+    timeout_seconds: 15
+    max_retries: 3
+    backoff_seconds: 2
+
+  session:
+    # Capital.com session tokens expire; refresh proactively.
+    refresh_margin_seconds: 60
