@@ -61,6 +61,16 @@ guard methods raise `LiveTradingDisabledError`.
 ### Backtesting (`backtesting/`)
 Paper CFD simulator modeling fills (spread/slippage), margin and PnL.
 
+### Orchestrator (`app/orchestrator.py`)
+The end-to-end pipeline that ties the pieces together for one symbol:
+Technical Analysis → Decision Agent → Risk Engine → Order Manager. It derives
+the `PortfolioState` from the paper simulator, builds the `TradeProposal` from
+the technical signal, writes a pre-trade audit record (a write failure
+deterministically blocks the trade), and returns a `PipelineResult` with the
+terminal state (`NO_TRADE`/`WAIT`/`WATCHLIST`/`RISK_REJECTED`/`READONLY_SKIPPED`/
+`EXECUTED`). Simulated fills happen only in BACKTEST/SHADOW; CAPITAL_DEMO and
+LIVE_DISABLED stop before execution.
+
 ## Safety invariants (enforced in code)
 
 - Only the **Order Manager** can act on orders.

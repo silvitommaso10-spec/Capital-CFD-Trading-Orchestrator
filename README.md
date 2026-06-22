@@ -21,6 +21,9 @@ Implemented:
   EMA/RSI/MACD/ATR, with ATR-based stop/target and `technical/trend/volume`
   scores.
 - **Decision Agent** implementing the multi-confirmation scoring/decision rules.
+- **End-to-end pipeline** (`app/orchestrator.py`): Technical Analysis → Decision
+  → Risk Engine → Order Manager, with portfolio state from the simulator and an
+  audit trail. Executes simulated fills in SHADOW/BACKTEST; read-only otherwise.
 - **Order Manager** safety boundary (only authorized order path; sends nothing
   to the broker in this version).
 - Secure logging with secret redaction, typed models, and unit tests.
