@@ -24,6 +24,9 @@ Implemented:
 - **End-to-end pipeline** (`app/orchestrator.py`): Technical Analysis → Decision
   → Risk Engine → Order Manager, with portfolio state from the simulator and an
   audit trail. Executes simulated fills in SHADOW/BACKTEST; read-only otherwise.
+- **Backtest engine** (`backtesting/engine.py`): replays historical 1H/15m
+  candles through the pipeline, manages stop/target exits and reports metrics
+  (net PnL, win rate, profit factor, max drawdown, equity curve).
 - **Order Manager** safety boundary (only authorized order path; sends nothing
   to the broker in this version).
 - Secure logging with secret redaction, typed models, and unit tests.

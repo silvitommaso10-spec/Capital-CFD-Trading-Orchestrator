@@ -59,7 +59,11 @@ details, prices and price WebSocket. No trading endpoints are implemented; the
 guard methods raise `LiveTradingDisabledError`.
 
 ### Backtesting (`backtesting/`)
-Paper CFD simulator modeling fills (spread/slippage), margin and PnL.
+Paper CFD simulator modeling fills (spread/slippage), margin and PnL, plus a
+`BacktestEngine` that replays historical 1H/15m candles through the
+Orchestrator. Entries come from the pipeline exactly as in shadow/live; the
+engine manages stop/target exits on each new bar and reports metrics (net PnL,
+return, win rate, profit factor, expectancy, max drawdown, equity curve).
 
 ### Orchestrator (`app/orchestrator.py`)
 The end-to-end pipeline that ties the pieces together for one symbol:
