@@ -90,6 +90,19 @@ terminal state (`NO_TRADE`/`WAIT`/`WATCHLIST`/`RISK_REJECTED`/`READONLY_SKIPPED`
 `EXECUTED`). Simulated fills happen only in BACKTEST/SHADOW; CAPITAL_DEMO and
 LIVE_DISABLED stop before execution.
 
+### Optional LLM layer (`app/llm.py`, `agents/llm_news.py`, `app/ai_director.py`)
+An optional, disableable layer over Claude (`claude-opus-4-8`), with a
+deterministic offline mock fallback. It is used **only** to interpret text:
+
+- **News interpreter** turns unstructured news into structured `MacroEvent`s
+  that feed the deterministic News Macro Agent — the decision stays
+  deterministic and auditable.
+- **AI Director** is read-only: it reads the daily report and audit trail and
+  produces an advisory briefing (explanations, anomalies, *suggested* tuning).
+
+Hard boundary: LLM output never reaches the Order Manager and never overrides
+the Risk Engine. The API key comes only from `ANTHROPIC_API_KEY` (environment).
+
 ## Safety invariants (enforced in code)
 
 - Only the **Order Manager** can act on orders.

@@ -41,6 +41,10 @@ Implemented:
   mode, plus a **Daily Report Agent** that summarizes pipeline runs.
 - **Shadow runner** (`python -m app.shadow`) wires every agent into the
   pipeline, runs all symbols read-only, and prints the daily report.
+- **Optional LLM layer** — a News interpreter (text → structured `MacroEvent`s
+  feeding the deterministic News Macro Agent) and a read-only **AI Director**
+  that explains decisions and suggests (never applies) tuning. Uses
+  `claude-opus-4-8`; falls back to a deterministic offline mock with no API key.
 - **Order Manager** safety boundary (only authorized order path; sends nothing
   to the broker in this version).
 - Secure logging with secret redaction, typed models, and unit tests.

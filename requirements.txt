@@ -3,5 +3,9 @@ PyYAML>=6.0
 requests>=2.31
 websocket-client>=1.6
 
+# Optional: LLM integration (News interpreter + AI Director).
+# Without it / without ANTHROPIC_API_KEY the system runs fully offline.
+anthropic>=0.40
+
 # Development / test dependencies.
 pytest>=7.4
