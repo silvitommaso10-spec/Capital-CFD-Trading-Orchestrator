@@ -28,8 +28,10 @@ from typing import Any, Protocol, Sequence
 
 from agents.candles import Candle
 from agents.daily_report import DailyReport, DailyReportAgent
-from agents.news_macro import NewsMacroAgent
+from agents.llm_news import LLMNewsInterpreter
+from agents.news_macro import MacroEvent, NewsMacroAgent
 from agents.social_sentiment import SocialSentimentAgent
+from app.ai_director import AIDirector
 from app.config import AppConfig, load_config, load_news_config
 from app.env import load_credentials
 from app.errors import MissingCredentialsError, OrchestratorError
@@ -55,6 +57,7 @@ class ShadowDataSource(Protocol):
 class ShadowRunReport:
     results: list[PipelineResult]
     report: DailyReport
+    briefing: str | None = None
 
     def render(self) -> str:
         lines = [format_daily_report(self.report.as_dict()), "", "--- Per symbol ---"]
@@ -64,6 +67,10 @@ class ShadowRunReport:
                 f"  {r.symbol:<8} {r.state.value:<18} "
                 f"score={r.decision.final_score:.3f} dir={direction}"
             )
+        if self.briefing:
+            lines.append("")
+            lines.append("--- AI Director (advisory) ---")
+            lines.append(self.briefing)
         return "\n".join(lines)
 
 
@@ -81,6 +88,8 @@ class ShadowRunner:
         points_15m: int = 200,
         news_agent: NewsMacroAgent | None = None,
         sentiment_agent: SocialSentimentAgent | None = None,
+        news_interpreter: LLMNewsInterpreter | None = None,
+        ai_director: AIDirector | None = None,
     ) -> None:
         self._config = config
         self._source = data_source
@@ -89,6 +98,8 @@ class ShadowRunner:
         )
         self._points_1h = points_1h
         self._points_15m = points_15m
+        self._news_interpreter = news_interpreter
+        self._ai_director = ai_director
         self._simulator = PaperCFDSimulator(starting_balance=starting_equity)
         self._orchestrator = Orchestrator(
             config,
@@ -99,10 +110,21 @@ class ShadowRunner:
             sentiment_agent=sentiment_agent,
         )
 
-    def run(self, now: datetime | None = None) -> ShadowRunReport:
+    def run(
+        self, now: datetime | None = None, news_text: str = ""
+    ) -> ShadowRunReport:
         now = now or datetime.now(timezone.utc)
         results: list[PipelineResult] = []
         marks: dict[str, float] = {}
+
+        # Interpret free-text news into structured macro events (LLM, optional).
+        # The News Macro Agent filters them per bucket, so attaching the full
+        # set to every snapshot is correct.
+        events: list[MacroEvent] = []
+        if self._news_interpreter is not None and news_text.strip():
+            events = self._news_interpreter.interpret(news_text, now)
+            if events:
+                logger.info("interpreted %d macro event(s) from news", len(events))
 
         for symbol in self._symbols:
             try:
@@ -115,7 +137,8 @@ class ShadowRunner:
 
             marks[symbol] = price.mid
             snapshot = MarketSnapshot(
-                symbol=symbol, candles_1h=c1h, candles_15m=c15, price=price, now=now
+                symbol=symbol, candles_1h=c1h, candles_15m=c15, price=price,
+                macro_events=events, now=now,
             )
             results.append(self._orchestrator.run_symbol(snapshot, marks))
 
@@ -123,7 +146,15 @@ class ShadowRunner:
         report = DailyReportAgent().build(
             results, report_date=now.date(), account=account
         )
-        return ShadowRunReport(results=results, report=report)
+
+        # Advisory briefing (LLM, optional; read-only).
+        briefing: str | None = None
+        if self._ai_director is not None:
+            briefing = self._ai_director.brief(
+                report.as_dict(), self._orchestrator.audit_log
+            )
+
+        return ShadowRunReport(results=results, report=report, briefing=briefing)
 
 
 class CapitalDataSource:
@@ -191,6 +222,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--balance", type=float, default=10_000.0)
     p.add_argument("--demo", action="store_true",
                    help="use synthetic data (no broker connection)")
+    p.add_argument("--news", help="free-text news to interpret via the LLM")
+    p.add_argument("--news-file", dest="news_file",
+                   help="path to a file of news text to interpret")
+    p.add_argument("--brief", action="store_true",
+                   help="generate the AI Director advisory briefing")
     return p
 
 
@@ -221,15 +257,27 @@ def run(argv: list[str] | None = None) -> int:
         client.login()
         source = CapitalDataSource(config, client, MarketDataAgent(config, client))
 
+    # Optional LLM layer (deterministic offline mock without ANTHROPIC_API_KEY).
+    from app.llm import build_llm_client
+
+    llm = build_llm_client()
+    news_config = load_news_config()
+    news_text = args.news or ""
+    if args.news_file:
+        with open(args.news_file, "r", encoding="utf-8") as handle:
+            news_text = handle.read()
+
     runner = ShadowRunner(
         config,
         source,
         symbols=args.symbols,
         starting_equity=args.balance,
-        news_agent=NewsMacroAgent(load_news_config()),
+        news_agent=NewsMacroAgent(news_config),
         sentiment_agent=SocialSentimentAgent(),
+        news_interpreter=LLMNewsInterpreter(llm, news_config),
+        ai_director=AIDirector(llm) if args.brief else None,
     )
-    report = runner.run()
+    report = runner.run(news_text=news_text)
     print(report.render())
     return 0
 

@@ -70,6 +70,10 @@ python -m app.backtest --demo --trade-threshold 0.5 --watchlist-threshold 0.4
 # Run the full shadow pipeline across all symbols (synthetic demo)
 python -m app.shadow --demo
 
+# ...with LLM news interpretation and an AI Director briefing
+# (needs ANTHROPIC_API_KEY; runs offline as a no-op without it)
+python -m app.shadow --demo --news "The FOMC held rates steady." --brief
+
 # Or from CSV candle files (timestamp,open,high,low,close,volume)
 python -m app.backtest --symbol US500 \
     --candles-1h data/local/US500_1h.csv \
