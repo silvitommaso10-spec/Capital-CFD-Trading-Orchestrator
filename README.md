@@ -1,5 +1,7 @@
 # Capital CFD Trading Orchestrator
 
+![CI](https://github.com/silvitommaso10-spec/capital-cfd-trading-orchestrator/actions/workflows/ci.yml/badge.svg)
+
 A Python system for automated CFD trading research and execution, built first
 for **backtesting**, **shadow trading** and **demo trading**.
 
