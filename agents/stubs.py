@@ -7,7 +7,10 @@ cannot execute trades.
 Implemented elsewhere: the Technical Analysis Agent in
 :mod:`agents.technical_analysis`, the Market Data Agent in
 :mod:`agents.market_data`, the News Macro Agent in :mod:`agents.news_macro`,
-and the Daily Report Agent in :mod:`agents.daily_report`.
+the Portfolio Agent in :mod:`agents.portfolio`, and the Daily Report Agent in
+:mod:`agents.daily_report`.
+
+The only remaining stub is the Social Sentiment Agent.
 """
 
 from __future__ import annotations
@@ -24,12 +27,3 @@ class SocialSentimentAgent(BaseAgent):
 
     def analyze(self, context: dict[str, Any]) -> Signal:
         return Signal(self.name, 0.5, "stub: social sentiment (weak signal)")
-
-
-class PortfolioAgent(BaseAgent):
-    """Equity, PnL, open positions, exposure, margin, used risk, correlations."""
-
-    name = "portfolio"
-
-    def analyze(self, context: dict[str, Any]) -> Signal:
-        return Signal(self.name, 0.5, "stub: portfolio fit")

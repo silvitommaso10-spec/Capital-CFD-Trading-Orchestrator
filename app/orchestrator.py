@@ -25,6 +25,7 @@ from typing import Any, Callable, Sequence
 from agents.candles import Candle
 from agents.decision_agent import Decision, DecisionAgent, DecisionOutcome, ScoreInputs
 from agents.news_macro import MacroEvent, NewsMacroAgent
+from agents.portfolio import PortfolioAgent
 from agents.technical_analysis import TechnicalAnalysisAgent, TechnicalSignal
 from app.config import AppConfig
 from app.errors import LiveTradingDisabledError
@@ -99,6 +100,7 @@ class Orchestrator:
         technical_agent: TechnicalAnalysisAgent | None = None,
         decision_agent: DecisionAgent | None = None,
         news_agent: NewsMacroAgent | None = None,
+        portfolio_agent: PortfolioAgent | None = None,
         risk_engine: RiskEngine | None = None,
         order_manager: OrderManager | None = None,
         audit_sink: AuditSink | None = None,
@@ -110,6 +112,7 @@ class Orchestrator:
         self._technical = technical_agent or TechnicalAnalysisAgent()
         self._decision = decision_agent or DecisionAgent()
         self._news = news_agent
+        self._portfolio = portfolio_agent or PortfolioAgent(config.risk)
         self._risk = risk_engine or RiskEngine(config.risk)
         self._order_manager = order_manager or OrderManager(self._mode, simulator)
         self.audit_log: list[dict[str, Any]] = []
@@ -150,7 +153,7 @@ class Orchestrator:
         portfolio_fit = (
             snapshot.portfolio_fit_score
             if snapshot.portfolio_fit_score is not None
-            else self._portfolio_fit(snapshot.symbol, inst.bucket, portfolio)
+            else self._portfolio.portfolio_fit(inst.bucket, portfolio)
         )
 
         # News/macro: use the News Macro Agent when configured, else the
@@ -333,6 +336,8 @@ class Orchestrator:
                     bucket=self._bucket_of.get(p.symbol, "unknown"),
                     direction=p.direction,
                     size=p.size,
+                    notional=p.notional,
+                    margin=p.margin,
                 )
                 for p in self._simulator.open_positions
             )
@@ -346,18 +351,6 @@ class Orchestrator:
             available_margin=available,
             open_positions=positions,
         )
-
-    def _portfolio_fit(
-        self, symbol: str, bucket: str, portfolio: PortfolioState
-    ) -> float:
-        """Simple portfolio-fit score: 1.0 if a new position fits, else 0.0."""
-
-        cfg = self._config.risk
-        if portfolio.open_count >= cfg.max_open_positions:
-            return 0.0
-        if portfolio.positions_in_bucket(bucket) >= cfg.max_positions_per_bucket:
-            return 0.0
-        return 1.0
 
     def _write_audit(self, record: dict[str, Any]) -> None:
         self._audit_sink(record)

@@ -26,6 +26,8 @@ Implemented:
 - **News Macro Agent** — maps macro events to correlation buckets, produces
   `news_score` (direction-aware), and flags contradictory unconfirmed news and
   high-impact event blackouts (→ WAIT).
+- **Portfolio Agent** — equity/PnL, gross & net exposure, used margin,
+  positions per bucket, and a continuous `portfolio_fit_score`.
 - **Decision Agent** implementing the multi-confirmation scoring/decision rules.
 - **End-to-end pipeline** (`app/orchestrator.py`): Technical Analysis → Decision
   → Risk Engine → Order Manager, with portfolio state from the simulator and an

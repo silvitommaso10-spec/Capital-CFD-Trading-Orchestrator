@@ -46,6 +46,9 @@ plus rationale/metadata) and **cannot execute trades**.
    contradictory unconfirmed news and high-impact blackouts (which drive a WAIT).
 4. **Social Sentiment Agent** — social sentiment (esp. BTC). Weak signal only; cannot open a trade by itself.
 5. **Portfolio Agent** — equity, daily starting capital, PnL, open positions, exposure, margin, used risk, correlations.
+   Implemented in `agents/portfolio.py`: gross/net exposure, used margin and
+   utilization, positions per bucket, and a continuous `portfolio_fit_score`
+   (hard 0 on a max-positions or per-bucket breach) used by the Decision Agent.
 6. **Decision Agent** — aggregates the scores and produces a trade candidate, watchlist, or no-trade (or wait on news conflict).
 7. **Daily Report Agent** — daily report for dashboard and email.
    Implemented in `agents/daily_report.py`: tallies pipeline results by terminal
