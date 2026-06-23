@@ -41,6 +41,9 @@ plus rationale/metadata) and **cannot execute trades**.
    assessment (stale / high-spread flags) consumed by the Risk Engine.
 2. **Technical Analysis Agent** — 1H trend, 15m setups, S/R, breakouts/pullbacks, volume, RSI/MACD/EMA/ATR, stop loss and technical targets.
 3. **News Macro Agent** — macro news, central banks, inflation, rates, employment, oil, geopolitics, crypto/SEC.
+   Implemented in `agents/news_macro.py`: maps event categories to buckets
+   (`config/news.yaml`), produces a direction-aware `news_score`, and flags
+   contradictory unconfirmed news and high-impact blackouts (which drive a WAIT).
 4. **Social Sentiment Agent** — social sentiment (esp. BTC). Weak signal only; cannot open a trade by itself.
 5. **Portfolio Agent** — equity, daily starting capital, PnL, open positions, exposure, margin, used risk, correlations.
 6. **Decision Agent** — aggregates the scores and produces a trade candidate, watchlist, or no-trade (or wait on news conflict).

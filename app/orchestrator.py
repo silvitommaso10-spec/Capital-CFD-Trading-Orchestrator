@@ -24,6 +24,7 @@ from typing import Any, Callable, Sequence
 
 from agents.candles import Candle
 from agents.decision_agent import Decision, DecisionAgent, DecisionOutcome, ScoreInputs
+from agents.news_macro import MacroEvent, NewsMacroAgent
 from agents.technical_analysis import TechnicalAnalysisAgent, TechnicalSignal
 from app.config import AppConfig
 from app.errors import LiveTradingDisabledError
@@ -65,6 +66,8 @@ class MarketSnapshot:
     portfolio_fit_score: float | None = None  # computed if None
     # Gates.
     news_conflict: bool = False
+    # Macro events for the News Macro Agent (used when a news_agent is set).
+    macro_events: Sequence[MacroEvent] = ()
     # Optional explicit market-quality overrides (else derived from price).
     spread: float | None = None
     data_age_seconds: float | None = None
@@ -95,6 +98,7 @@ class Orchestrator:
         starting_equity: float = 10_000.0,
         technical_agent: TechnicalAnalysisAgent | None = None,
         decision_agent: DecisionAgent | None = None,
+        news_agent: NewsMacroAgent | None = None,
         risk_engine: RiskEngine | None = None,
         order_manager: OrderManager | None = None,
         audit_sink: AuditSink | None = None,
@@ -105,6 +109,7 @@ class Orchestrator:
         self._starting_equity = starting_equity
         self._technical = technical_agent or TechnicalAnalysisAgent()
         self._decision = decision_agent or DecisionAgent()
+        self._news = news_agent
         self._risk = risk_engine or RiskEngine(config.risk)
         self._order_manager = order_manager or OrderManager(self._mode, simulator)
         self.audit_log: list[dict[str, Any]] = []
@@ -148,15 +153,30 @@ class Orchestrator:
             else self._portfolio_fit(snapshot.symbol, inst.bucket, portfolio)
         )
 
+        # News/macro: use the News Macro Agent when configured, else the
+        # static values carried by the snapshot.
+        if self._news is not None:
+            assessment = self._news.assess(
+                bucket=inst.bucket,
+                now=now,
+                events=snapshot.macro_events,
+                direction=ta.direction,
+            )
+            news_score = assessment.news_score
+            news_conflict = assessment.block
+        else:
+            news_score = snapshot.news_score
+            news_conflict = snapshot.news_conflict
+
         # 2. Decision.
         inputs = ScoreInputs(
             technical_score=ta.technical_score,
             trend_score=ta.trend_score,
             volume_score=ta.volume_score,
-            news_score=snapshot.news_score,
+            news_score=news_score,
             sentiment_score=snapshot.sentiment_score,
             portfolio_fit_score=portfolio_fit,
-            news_conflict=snapshot.news_conflict,
+            news_conflict=news_conflict,
             risk_rejected=False,  # the Risk Engine runs as its own stage below
         )
         decision = self._decision.decide(inputs)
@@ -170,11 +190,12 @@ class Orchestrator:
                 "technical": ta.technical_score,
                 "trend": ta.trend_score,
                 "volume": ta.volume_score,
-                "news": snapshot.news_score,
+                "news": news_score,
                 "sentiment": snapshot.sentiment_score,
                 "portfolio_fit": portfolio_fit,
                 "final": decision.final_score,
             },
+            "news_conflict": news_conflict,
             "decision": decision.outcome.value,
         }
 

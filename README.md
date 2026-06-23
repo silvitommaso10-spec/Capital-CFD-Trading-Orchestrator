@@ -23,6 +23,9 @@ Implemented:
 - **Technical Analysis Agent** — multi-timeframe (1H trend + 15m setup) using
   EMA/RSI/MACD/ATR, with ATR-based stop/target and `technical/trend/volume`
   scores.
+- **News Macro Agent** — maps macro events to correlation buckets, produces
+  `news_score` (direction-aware), and flags contradictory unconfirmed news and
+  high-impact event blackouts (→ WAIT).
 - **Decision Agent** implementing the multi-confirmation scoring/decision rules.
 - **End-to-end pipeline** (`app/orchestrator.py`): Technical Analysis → Decision
   → Risk Engine → Order Manager, with portfolio state from the simulator and an

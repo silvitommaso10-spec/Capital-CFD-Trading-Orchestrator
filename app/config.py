@@ -194,6 +194,45 @@ class AppConfig:
         return self.broker.mode
 
 
+@dataclass(frozen=True)
+class NewsConfig:
+    conflict_lookback_minutes: int
+    high_impact_blackout_minutes_before: int
+    high_impact_blackout_minutes_after: int
+    tracked_categories: tuple[str, ...]
+    category_bucket_impact: dict[str, tuple[str, ...]]
+
+    def buckets_for_category(self, category: str) -> tuple[str, ...]:
+        return self.category_bucket_impact.get(category, ())
+
+    @staticmethod
+    def from_dict(raw: dict[str, Any]) -> "NewsConfig":
+        n = raw.get("news", raw)
+        impact = {
+            str(cat): tuple(str(b) for b in buckets)
+            for cat, buckets in (n.get("category_bucket_impact", {}) or {}).items()
+        }
+        return NewsConfig(
+            conflict_lookback_minutes=int(n.get("conflict_lookback_minutes", 120)),
+            high_impact_blackout_minutes_before=int(
+                n.get("high_impact_blackout_minutes_before", 15)
+            ),
+            high_impact_blackout_minutes_after=int(
+                n.get("high_impact_blackout_minutes_after", 15)
+            ),
+            tracked_categories=tuple(
+                str(c) for c in (n.get("tracked_categories", []) or [])
+            ),
+            category_bucket_impact=impact,
+        )
+
+
+def load_news_config(config_dir: Path | str = CONFIG_DIR) -> NewsConfig:
+    """Load the news/macro configuration from ``config_dir``."""
+
+    return NewsConfig.from_dict(_load_yaml(Path(config_dir) / "news.yaml"))
+
+
 def load_config(config_dir: Path | str = CONFIG_DIR) -> AppConfig:
     """Load broker, risk and instrument configuration from ``config_dir``."""
 
