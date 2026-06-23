@@ -76,6 +76,9 @@ python -m app.shadow --demo
 # (needs ANTHROPIC_API_KEY; runs offline as a no-op without it)
 python -m app.shadow --demo --news "The FOMC held rates steady." --brief
 
+# ...persisting the audit trail to a JSONL file
+python -m app.shadow --demo --audit-file logs/audit.jsonl
+
 # Or from CSV candle files (timestamp,open,high,low,close,volume)
 python -m app.backtest --symbol US500 \
     --candles-1h data/local/US500_1h.csv \

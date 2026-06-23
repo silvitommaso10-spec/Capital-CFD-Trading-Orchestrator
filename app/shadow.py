@@ -37,7 +37,7 @@ from app.env import load_credentials
 from app.errors import MissingCredentialsError, OrchestratorError
 from app.logging_utils import configure_logging, get_logger
 from app.modes import OperatingMode
-from app.orchestrator import MarketSnapshot, Orchestrator, PipelineResult
+from app.orchestrator import AuditSink, MarketSnapshot, Orchestrator, PipelineResult
 from app.reporting import format_daily_report
 from backtesting.paper_simulator import PaperCFDSimulator
 from capital.models import Price
@@ -90,6 +90,7 @@ class ShadowRunner:
         sentiment_agent: SocialSentimentAgent | None = None,
         news_interpreter: LLMNewsInterpreter | None = None,
         ai_director: AIDirector | None = None,
+        audit_sink: AuditSink | None = None,
     ) -> None:
         self._config = config
         self._source = data_source
@@ -108,6 +109,7 @@ class ShadowRunner:
             starting_equity=starting_equity,
             news_agent=news_agent,
             sentiment_agent=sentiment_agent,
+            audit_sink=audit_sink,
         )
 
     def run(
@@ -227,6 +229,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="path to a file of news text to interpret")
     p.add_argument("--brief", action="store_true",
                    help="generate the AI Director advisory briefing")
+    p.add_argument("--audit-file", dest="audit_file",
+                   help="append the audit trail to this JSONL file")
     return p
 
 
@@ -258,6 +262,7 @@ def run(argv: list[str] | None = None) -> int:
         source = CapitalDataSource(config, client, MarketDataAgent(config, client))
 
     # Optional LLM layer (deterministic offline mock without ANTHROPIC_API_KEY).
+    from app.audit import JsonlAuditSink
     from app.llm import build_llm_client
 
     llm = build_llm_client()
@@ -276,6 +281,7 @@ def run(argv: list[str] | None = None) -> int:
         sentiment_agent=SocialSentimentAgent(),
         news_interpreter=LLMNewsInterpreter(llm, news_config),
         ai_director=AIDirector(llm) if args.brief else None,
+        audit_sink=JsonlAuditSink(args.audit_file) if args.audit_file else None,
     )
     report = runner.run(news_text=news_text)
     print(report.render())

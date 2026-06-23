@@ -128,7 +128,10 @@ class Orchestrator:
         self._risk = risk_engine or RiskEngine(config.risk)
         self._order_manager = order_manager or OrderManager(self._mode, simulator)
         self.audit_log: list[dict[str, Any]] = []
-        self._audit_sink: AuditSink = audit_sink or self.audit_log.append
+        # Optional external sink (e.g. a JSONL file). The in-memory log is
+        # always kept; the external sink is additionally written, and a failure
+        # to persist the pre-trade record blocks the trade.
+        self._external_sink: AuditSink | None = audit_sink
         self._bucket_of = {
             inst.symbol: inst.bucket for inst in config.instruments.instruments
         }
@@ -230,7 +233,7 @@ class Orchestrator:
                 DecisionOutcome.WATCHLIST: PipelineState.WATCHLIST,
                 DecisionOutcome.NO_TRADE: PipelineState.NO_TRADE,
             }[decision.outcome]
-            self._write_audit(audit)
+            self._write_audit_safe(audit)
             return PipelineResult(
                 symbol=snapshot.symbol,
                 state=state,
@@ -266,7 +269,7 @@ class Orchestrator:
             "size": risk.sizing.size if risk.sizing else None,
         }
         if not risk.approved:
-            self._write_audit({**audit, "stage": "risk_rejected"})
+            self._write_audit_safe({**audit, "stage": "risk_rejected"})
             return PipelineResult(
                 symbol=snapshot.symbol,
                 state=PipelineState.RISK_REJECTED,
@@ -281,7 +284,7 @@ class Orchestrator:
         if self._mode in SIMULATED_MODES and self._simulator is not None:
             order = self._order_manager.submit(proposal, risk)
             audit["order"] = {"accepted": order.accepted, "detail": order.detail}
-            self._write_audit({**audit, "stage": "executed"})
+            self._write_audit_safe({**audit, "stage": "executed"})
             return PipelineResult(
                 symbol=snapshot.symbol,
                 state=PipelineState.EXECUTED,
@@ -295,7 +298,7 @@ class Orchestrator:
 
         # Read-only modes: approved but intentionally not executed.
         audit["order"] = {"accepted": False, "detail": "read-only mode"}
-        self._write_audit({**audit, "stage": "readonly_skipped"})
+        self._write_audit_safe({**audit, "stage": "readonly_skipped"})
         logger.info("%s approved but not executed (read-only mode)", snapshot.symbol)
         return PipelineResult(
             symbol=snapshot.symbol,
@@ -382,4 +385,21 @@ class Orchestrator:
         return cached
 
     def _write_audit(self, record: dict[str, Any]) -> None:
-        self._audit_sink(record)
+        """Record an audit entry; may raise if the external sink fails."""
+
+        self.audit_log.append(record)
+        if self._external_sink is not None:
+            self._external_sink(record)
+
+    def _write_audit_safe(self, record: dict[str, Any]) -> None:
+        """Record an audit entry, swallowing external-sink errors.
+
+        Used for non-critical stages so a late persistence failure does not
+        crash the run. The pre-trade write uses :meth:`_write_audit` directly so
+        its failure can block the trade.
+        """
+
+        try:
+            self._write_audit(record)
+        except Exception as exc:  # noqa: BLE001 - persistence is best-effort here
+            logger.warning("audit persistence failed (non-critical): %s", exc)

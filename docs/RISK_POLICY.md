@@ -64,3 +64,12 @@ available margin.
 10. Sizing + margin sufficiency
 
 All checks are evaluated (no short-circuit) so the rejection set is complete.
+
+## Audit persistence
+
+The Orchestrator writes a pre-trade audit record before the Risk Engine runs.
+With a persistent sink (`app/audit.py`'s `JsonlAuditSink`, enabled via
+`python -m app.shadow --audit-file ...`), a failure to persist that record
+raises, which sets `audit_log_ok=False` and causes a deterministic rejection —
+honouring "no trade if the audit log cannot be saved" against real storage. The
+in-memory audit log is always kept as well (the AI Director reads it).
