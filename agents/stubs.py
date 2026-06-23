@@ -5,8 +5,9 @@ milestones. Each returns a neutral signal for now. They are analysis-only and
 cannot execute trades.
 
 The Technical Analysis Agent is fully implemented in
-:mod:`agents.technical_analysis`; the Market Data Agent in
-:mod:`agents.market_data`.
+:mod:`agents.technical_analysis`, the Market Data Agent in
+:mod:`agents.market_data`, and the Daily Report Agent in
+:mod:`agents.daily_report`.
 """
 
 from __future__ import annotations
@@ -41,12 +42,3 @@ class PortfolioAgent(BaseAgent):
 
     def analyze(self, context: dict[str, Any]) -> Signal:
         return Signal(self.name, 0.5, "stub: portfolio fit")
-
-
-class DailyReportAgent:
-    """Builds the daily report for the dashboard and email (later milestone)."""
-
-    name = "daily_report"
-
-    def build_report(self, context: dict[str, Any]) -> dict[str, Any]:
-        return {"status": "stub", "context_keys": sorted(context)}

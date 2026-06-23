@@ -30,6 +30,8 @@ Implemented:
 - **Backtest engine** (`backtesting/engine.py`): replays historical 1H/15m
   candles through the pipeline, manages stop/target exits and reports metrics
   (net PnL, win rate, profit factor, max drawdown, equity curve).
+- **Backtest CLI** (`python -m app.backtest`) with CSV loading and a `--demo`
+  mode, plus a **Daily Report Agent** that summarizes pipeline runs.
 - **Order Manager** safety boundary (only authorized order path; sends nothing
   to the broker in this version).
 - Secure logging with secret redaction, typed models, and unit tests.
@@ -48,6 +50,14 @@ python -m app.main
 
 # Run the tests
 python -m pytest
+
+# Run a backtest on synthetic data (no broker needed)
+python -m app.backtest --demo --trade-threshold 0.5 --watchlist-threshold 0.4
+
+# Or from CSV candle files (timestamp,open,high,low,close,volume)
+python -m app.backtest --symbol US500 \
+    --candles-1h data/local/US500_1h.csv \
+    --candles-15m data/local/US500_15m.csv
 ```
 
 ## Operating modes

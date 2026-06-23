@@ -45,6 +45,9 @@ plus rationale/metadata) and **cannot execute trades**.
 5. **Portfolio Agent** — equity, daily starting capital, PnL, open positions, exposure, margin, used risk, correlations.
 6. **Decision Agent** — aggregates the scores and produces a trade candidate, watchlist, or no-trade (or wait on news conflict).
 7. **Daily Report Agent** — daily report for dashboard and email.
+   Implemented in `agents/daily_report.py`: tallies pipeline results by terminal
+   state and lists executed trades. Rendered to text via `app/reporting.py`; the
+   backtest CLI (`python -m app.backtest`) renders the backtest report.
 
 ### Risk Engine (`risk/`)
 Deterministic approve/reject for every trade. See `RISK_POLICY.md`. Includes

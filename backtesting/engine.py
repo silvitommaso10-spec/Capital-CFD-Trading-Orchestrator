@@ -25,9 +25,9 @@ from agents.decision_agent import DecisionAgent
 
 if TYPE_CHECKING:
     from agents.market_data import MarketDataAgent
+    from app.orchestrator import Orchestrator
 from app.config import AppConfig
 from app.modes import OperatingMode
-from app.orchestrator import MarketSnapshot, Orchestrator, PipelineState
 from backtesting.paper_simulator import PaperCFDSimulator, SimulatedPosition
 from capital.models import Price
 from risk.models import Direction
@@ -115,6 +115,9 @@ class BacktestEngine:
         candles_1h: Sequence[Candle],
         candles_15m: Sequence[Candle],
     ) -> BacktestResult:
+        # Imported here to avoid a backtesting <-> app.orchestrator import cycle.
+        from app.orchestrator import MarketSnapshot, Orchestrator, PipelineState
+
         simulator = PaperCFDSimulator(
             starting_balance=self.starting_balance, spread=self.assumed_spread
         )
