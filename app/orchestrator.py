@@ -26,6 +26,7 @@ from agents.candles import Candle
 from agents.decision_agent import Decision, DecisionAgent, DecisionOutcome, ScoreInputs
 from agents.news_macro import MacroEvent, NewsMacroAgent
 from agents.portfolio import PortfolioAgent
+from agents.social_sentiment import SentimentSample, SocialSentimentAgent
 from agents.technical_analysis import TechnicalAnalysisAgent, TechnicalSignal
 from app.config import AppConfig
 from app.errors import LiveTradingDisabledError
@@ -69,6 +70,8 @@ class MarketSnapshot:
     news_conflict: bool = False
     # Macro events for the News Macro Agent (used when a news_agent is set).
     macro_events: Sequence[MacroEvent] = ()
+    # Social sentiment samples (used when a sentiment_agent is set).
+    social_samples: Sequence[SentimentSample] = ()
     # Optional explicit market-quality overrides (else derived from price).
     spread: float | None = None
     data_age_seconds: float | None = None
@@ -100,6 +103,7 @@ class Orchestrator:
         technical_agent: TechnicalAnalysisAgent | None = None,
         decision_agent: DecisionAgent | None = None,
         news_agent: NewsMacroAgent | None = None,
+        sentiment_agent: SocialSentimentAgent | None = None,
         portfolio_agent: PortfolioAgent | None = None,
         risk_engine: RiskEngine | None = None,
         order_manager: OrderManager | None = None,
@@ -112,6 +116,7 @@ class Orchestrator:
         self._technical = technical_agent or TechnicalAnalysisAgent()
         self._decision = decision_agent or DecisionAgent()
         self._news = news_agent
+        self._sentiment = sentiment_agent
         self._portfolio = portfolio_agent or PortfolioAgent(config.risk)
         self._risk = risk_engine or RiskEngine(config.risk)
         self._order_manager = order_manager or OrderManager(self._mode, simulator)
@@ -171,13 +176,21 @@ class Orchestrator:
             news_score = snapshot.news_score
             news_conflict = snapshot.news_conflict
 
+        # Social sentiment: a weak signal; use the agent when configured.
+        if self._sentiment is not None:
+            sentiment_score = self._sentiment.assess(
+                inst.bucket, now, snapshot.social_samples
+            ).score
+        else:
+            sentiment_score = snapshot.sentiment_score
+
         # 2. Decision.
         inputs = ScoreInputs(
             technical_score=ta.technical_score,
             trend_score=ta.trend_score,
             volume_score=ta.volume_score,
             news_score=news_score,
-            sentiment_score=snapshot.sentiment_score,
+            sentiment_score=sentiment_score,
             portfolio_fit_score=portfolio_fit,
             news_conflict=news_conflict,
             risk_rejected=False,  # the Risk Engine runs as its own stage below
@@ -194,7 +207,7 @@ class Orchestrator:
                 "trend": ta.trend_score,
                 "volume": ta.volume_score,
                 "news": news_score,
-                "sentiment": snapshot.sentiment_score,
+                "sentiment": sentiment_score,
                 "portfolio_fit": portfolio_fit,
                 "final": decision.final_score,
             },

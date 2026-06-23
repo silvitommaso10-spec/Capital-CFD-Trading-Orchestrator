@@ -45,6 +45,9 @@ plus rationale/metadata) and **cannot execute trades**.
    (`config/news.yaml`), produces a direction-aware `news_score`, and flags
    contradictory unconfirmed news and high-impact blackouts (which drive a WAIT).
 4. **Social Sentiment Agent** — social sentiment (esp. BTC). Weak signal only; cannot open a trade by itself.
+   Implemented in `agents/social_sentiment.py`: aggregates weighted sentiment
+   samples into a bounded score (deviation from neutral is relevance-damped per
+   bucket). With a 0.05 decision weight it can only nudge confidence.
 5. **Portfolio Agent** — equity, daily starting capital, PnL, open positions, exposure, margin, used risk, correlations.
    Implemented in `agents/portfolio.py`: gross/net exposure, used margin and
    utilization, positions per bucket, and a continuous `portfolio_fit_score`

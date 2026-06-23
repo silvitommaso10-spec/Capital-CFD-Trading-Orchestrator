@@ -28,6 +28,8 @@ Implemented:
   high-impact event blackouts (→ WAIT).
 - **Portfolio Agent** — equity/PnL, gross & net exposure, used margin,
   positions per bucket, and a continuous `portfolio_fit_score`.
+- **Social Sentiment Agent** — a deliberately weak, bounded signal (most
+  relevant for BTC) that can nudge confidence but never open a trade alone.
 - **Decision Agent** implementing the multi-confirmation scoring/decision rules.
 - **End-to-end pipeline** (`app/orchestrator.py`): Technical Analysis → Decision
   → Risk Engine → Order Manager, with portfolio state from the simulator and an
