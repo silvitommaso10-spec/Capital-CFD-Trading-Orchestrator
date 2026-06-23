@@ -39,6 +39,8 @@ Implemented:
   (net PnL, win rate, profit factor, max drawdown, equity curve).
 - **Backtest CLI** (`python -m app.backtest`) with CSV loading and a `--demo`
   mode, plus a **Daily Report Agent** that summarizes pipeline runs.
+- **Shadow runner** (`python -m app.shadow`) wires every agent into the
+  pipeline, runs all symbols read-only, and prints the daily report.
 - **Order Manager** safety boundary (only authorized order path; sends nothing
   to the broker in this version).
 - Secure logging with secret redaction, typed models, and unit tests.
@@ -60,6 +62,9 @@ python -m pytest
 
 # Run a backtest on synthetic data (no broker needed)
 python -m app.backtest --demo --trade-threshold 0.5 --watchlist-threshold 0.4
+
+# Run the full shadow pipeline across all symbols (synthetic demo)
+python -m app.shadow --demo
 
 # Or from CSV candle files (timestamp,open,high,low,close,volume)
 python -m app.backtest --symbol US500 \
