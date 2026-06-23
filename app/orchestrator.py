@@ -27,8 +27,12 @@ from agents.decision_agent import Decision, DecisionAgent, DecisionOutcome, Scor
 from agents.news_macro import MacroEvent, NewsMacroAgent
 from agents.portfolio import PortfolioAgent
 from agents.social_sentiment import SentimentSample, SocialSentimentAgent
-from agents.technical_analysis import TechnicalAnalysisAgent, TechnicalSignal
-from app.config import AppConfig
+from agents.technical_analysis import (
+    TechnicalAnalysisAgent,
+    TechnicalConfig,
+    TechnicalSignal,
+)
+from app.config import AppConfig, StrategyConfig, load_strategy_config
 from app.errors import LiveTradingDisabledError
 from app.logging_utils import get_logger
 from app.modes import SIMULATED_MODES, OperatingMode
@@ -105,12 +109,15 @@ class Orchestrator:
         news_agent: NewsMacroAgent | None = None,
         sentiment_agent: SocialSentimentAgent | None = None,
         portfolio_agent: PortfolioAgent | None = None,
+        strategy_config: StrategyConfig | None = None,
         risk_engine: RiskEngine | None = None,
         order_manager: OrderManager | None = None,
         audit_sink: AuditSink | None = None,
     ) -> None:
         self._config = config
         self._mode = mode or config.mode
+        self._strategy = strategy_config or load_strategy_config()
+        self._tech_config_cache: dict[str, TechnicalConfig] = {}
         self._simulator = simulator
         self._starting_equity = starting_equity
         self._technical = technical_agent or TechnicalAnalysisAgent()
@@ -145,11 +152,12 @@ class Orchestrator:
         now = snapshot.now or datetime.now(timezone.utc)
         marks = dict(marks or {})
 
-        # 1. Technical analysis.
+        # 1. Technical analysis with the per-bucket strategy profile.
         ta = self._technical.analyze_full(
             symbol=snapshot.symbol,
             candles_1h=snapshot.candles_1h,
             candles_15m=snapshot.candles_15m,
+            config=self._technical_config_for(inst.bucket),
         )
         if ta.entry_price is not None:
             marks.setdefault(snapshot.symbol, ta.entry_price)
@@ -364,6 +372,14 @@ class Orchestrator:
             available_margin=available,
             open_positions=positions,
         )
+
+    def _technical_config_for(self, bucket: str) -> TechnicalConfig:
+        cached = self._tech_config_cache.get(bucket)
+        if cached is None:
+            profile = self._strategy.for_bucket(bucket)
+            cached = TechnicalConfig(**profile.technical_kwargs())
+            self._tech_config_cache[bucket] = cached
+        return cached
 
     def _write_audit(self, record: dict[str, Any]) -> None:
         self._audit_sink(record)

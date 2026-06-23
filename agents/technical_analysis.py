@@ -130,8 +130,11 @@ class TechnicalAnalysisAgent(BaseAgent):
         symbol: str,
         candles_1h: Sequence[Candle],
         candles_15m: Sequence[Candle],
+        config: TechnicalConfig | None = None,
     ) -> TechnicalSignal:
-        cfg = self._cfg
+        # A per-call config (e.g. a per-bucket strategy profile) overrides the
+        # agent's default.
+        cfg = config or self._cfg
 
         if (
             len(candles_1h) < cfg.trend_slow + 1
@@ -147,7 +150,7 @@ class TechnicalAnalysisAgent(BaseAgent):
                 rationale="insufficient candle history",
             )
 
-        trend, trend_score, trend_ind = self._classify_trend(candles_1h)
+        trend, trend_score, trend_ind = self._classify_trend(candles_1h, cfg)
         direction = {
             Trend.UP: Direction.LONG,
             Trend.DOWN: Direction.SHORT,
@@ -165,7 +168,7 @@ class TechnicalAnalysisAgent(BaseAgent):
 
         support = min(lows(candles_15m)[-cfg.sr_lookback :])
         resistance = max(highs(candles_15m)[-cfg.sr_lookback :])
-        volume_score = self._volume_score(candles_15m)
+        volume_score = self._volume_score(candles_15m, cfg)
 
         base_ind = {
             "ema_fast_15m": float(ema_f or 0.0),
@@ -204,7 +207,7 @@ class TechnicalAnalysisAgent(BaseAgent):
             6,
         )
 
-        stop, target = self._stop_and_target(entry, atr15, direction)
+        stop, target = self._stop_and_target(entry, atr15, direction, cfg)
 
         return TechnicalSignal(
             symbol=symbol,
@@ -228,9 +231,8 @@ class TechnicalAnalysisAgent(BaseAgent):
     # -- internals ---------------------------------------------------------
 
     def _classify_trend(
-        self, candles_1h: Sequence[Candle]
+        self, candles_1h: Sequence[Candle], cfg: TechnicalConfig
     ) -> tuple[Trend, float, dict[str, float]]:
-        cfg = self._cfg
         c = closes(candles_1h)
         ema_fast = ind.latest(ind.ema(c, cfg.trend_fast)) or c[-1]
         ema_slow = ind.latest(ind.ema(c, cfg.trend_slow)) or c[-1]
@@ -255,8 +257,9 @@ class TechnicalAnalysisAgent(BaseAgent):
                 return Trend.DOWN, strength, ind_out
         return Trend.SIDEWAYS, 0.0, ind_out
 
-    def _volume_score(self, candles_15m: Sequence[Candle]) -> float:
-        cfg = self._cfg
+    def _volume_score(
+        self, candles_15m: Sequence[Candle], cfg: TechnicalConfig
+    ) -> float:
         vols = volumes(candles_15m)
         window = vols[-cfg.volume_lookback :]
         avg = sum(window) / len(window) if window else 0.0
@@ -267,9 +270,8 @@ class TechnicalAnalysisAgent(BaseAgent):
         return _clamp(ratio / 2.0)
 
     def _stop_and_target(
-        self, entry: float, atr15: float, direction: Direction
+        self, entry: float, atr15: float, direction: Direction, cfg: TechnicalConfig
     ) -> tuple[float, float]:
-        cfg = self._cfg
         risk = cfg.atr_stop_mult * atr15
         if direction is Direction.LONG:
             stop = entry - risk

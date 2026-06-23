@@ -1,0 +1,37 @@
+# Strategy profiles.
+#
+# `default` defines the baseline technical parameters. Each entry under
+# `buckets` overrides only the keys that differ for that correlation bucket,
+# so per-asset specialization happens through configuration rather than
+# duplicated agent code. Unknown keys are ignored.
+
+strategy:
+  default:
+    trend_fast: 20            # 1H fast EMA for trend
+    trend_slow: 50            # 1H slow EMA for trend
+    setup_fast: 9             # 15m fast EMA for entry timing
+    setup_slow: 21            # 15m slow EMA for entry timing
+    rsi_period: 14
+    atr_period: 14
+    atr_stop_mult: 1.5        # stop distance = atr_stop_mult * ATR(15m)
+    reward_risk: 2.0          # target distance = reward_risk * stop distance
+    sr_lookback: 20
+    volume_lookback: 20
+    min_trend_strength: 0.15  # min normalized EMA separation to call a trend
+
+  buckets:
+    equity_indices:
+      reward_risk: 2.0
+
+    metals:
+      atr_stop_mult: 1.6
+      reward_risk: 1.9
+
+    energy:
+      atr_stop_mult: 1.8       # oil is choppy -> a bit more room
+      reward_risk: 1.9
+
+    crypto:
+      atr_stop_mult: 2.2       # crypto is volatile -> wider stops
+      reward_risk: 2.2
+      min_trend_strength: 0.20  # demand a clearer trend

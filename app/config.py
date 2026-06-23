@@ -7,7 +7,7 @@ ever read from these files; credentials come from the environment (see
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Any
 
@@ -225,6 +225,74 @@ class NewsConfig:
             ),
             category_bucket_impact=impact,
         )
+
+
+@dataclass(frozen=True)
+class StrategyProfile:
+    """Technical parameters for a strategy profile.
+
+    Field names mirror ``agents.technical_analysis.TechnicalConfig`` so a
+    profile can be converted directly into that config.
+    """
+
+    trend_fast: int = 20
+    trend_slow: int = 50
+    setup_fast: int = 9
+    setup_slow: int = 21
+    rsi_period: int = 14
+    atr_period: int = 14
+    atr_stop_mult: float = 1.5
+    reward_risk: float = 2.0
+    sr_lookback: int = 20
+    volume_lookback: int = 20
+    min_trend_strength: float = 0.15
+
+    def technical_kwargs(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _profile_fields() -> set[str]:
+    return {f.name for f in fields(StrategyProfile)}
+
+
+@dataclass(frozen=True)
+class StrategyConfig:
+    """Default strategy profile plus per-bucket overrides."""
+
+    default: StrategyProfile
+    buckets: dict[str, dict[str, Any]]
+
+    def for_bucket(self, bucket: str) -> StrategyProfile:
+        """Return the profile for ``bucket`` (default merged with overrides)."""
+
+        overrides = self.buckets.get(bucket, {})
+        if not overrides:
+            return self.default
+        merged = {**asdict(self.default), **overrides}
+        return StrategyProfile(**merged)
+
+    @staticmethod
+    def from_dict(raw: dict[str, Any]) -> "StrategyConfig":
+        s = raw.get("strategy", raw)
+        valid = _profile_fields()
+        default_raw = {
+            k: v for k, v in (s.get("default", {}) or {}).items() if k in valid
+        }
+        default = StrategyProfile(**default_raw)
+        buckets = {
+            str(name): {k: v for k, v in (overrides or {}).items() if k in valid}
+            for name, overrides in (s.get("buckets", {}) or {}).items()
+        }
+        return StrategyConfig(default=default, buckets=buckets)
+
+
+def load_strategy_config(config_dir: Path | str = CONFIG_DIR) -> StrategyConfig:
+    """Load strategy profiles. Falls back to defaults if the file is absent."""
+
+    path = Path(config_dir) / "strategy.yaml"
+    if not path.exists():
+        return StrategyConfig(default=StrategyProfile(), buckets={})
+    return StrategyConfig.from_dict(_load_yaml(path))
 
 
 def load_news_config(config_dir: Path | str = CONFIG_DIR) -> NewsConfig:

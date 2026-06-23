@@ -61,6 +61,25 @@ the Social Sentiment Agent produces a weak signal only.
 
 Indicator primitives (SMA, EMA, RSI, MACD, ATR) live in `agents/indicators.py`.
 
+## Per-bucket strategy profiles
+
+Per-asset specialization happens through **configuration**, not duplicated
+agents. `config/strategy.yaml` defines a `default` profile and per-bucket
+overrides; `app/config.py` loads them (`StrategyConfig.for_bucket` merges a
+bucket's overrides onto the default). The Orchestrator resolves the profile for
+each symbol's bucket and passes the corresponding `TechnicalConfig` to the
+Technical Analysis Agent.
+
+| Bucket          | Notable overrides                          |
+|-----------------|--------------------------------------------|
+| equity_indices  | reward_risk 2.0                            |
+| metals          | atr_stop_mult 1.6, reward_risk 1.9         |
+| energy          | atr_stop_mult 1.8 (oil is choppy)          |
+| crypto          | atr_stop_mult 2.2, reward_risk 2.2, min_trend_strength 0.20 |
+
+This keeps one function-oriented agent set while letting each correlation
+bucket use stops, targets and trend sensitivity suited to its volatility.
+
 ## Notes for later milestones
 
 - The Market Data Agent will build the 1H/15m candles and data-quality flags
