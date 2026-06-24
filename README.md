@@ -106,8 +106,9 @@ impossible to enable in this version.
 
 ## Documentation
 
-See [`docs/`](docs/): project spec, architecture, risk policy, CFD spec,
-Capital.com integration and strategy spec.
+Start with the [Usage Guide](docs/USAGE.md). See [`docs/`](docs/) for the
+project spec, architecture, risk policy, CFD spec, Capital.com integration and
+strategy spec.
 
 ## Project layout
 
