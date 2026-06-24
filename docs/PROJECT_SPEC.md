@@ -71,7 +71,7 @@ backtesting/    # paper CFD simulator
 data/           # local data/cache (later)
 dashboard/      # dashboard/reporting (later)
 monitoring/     # monitoring/alerting (later)
-config/         # broker/risk/instruments/news YAML
+config/         # broker/risk/instruments/news/strategy YAML
 tests/          # unit tests
 docs/           # documentation
 ```

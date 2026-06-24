@@ -1,5 +1,7 @@
 # Capital CFD Trading Orchestrator
 
+![CI](https://github.com/silvitommaso10-spec/capital-cfd-trading-orchestrator/actions/workflows/ci.yml/badge.svg)
+
 A Python system for automated CFD trading research and execution, built first
 for **backtesting**, **shadow trading** and **demo trading**.
 
@@ -17,7 +19,37 @@ Implemented:
   read-only price WebSocket.
 - Deterministic **Risk Engine** and risk-first **Margin Calculator**.
 - **Paper CFD simulator** for BACKTEST/SHADOW modes.
+- **Market Data Agent** — OHLCV candles (broker history or tick aggregation),
+  spread/volume, and data-quality flags (stale / high-spread) for the Risk
+  Engine and pipeline.
+- **Technical Analysis Agent** — multi-timeframe (1H trend + 15m setup) using
+  EMA/RSI/MACD/ATR, with ATR-based stop/target and `technical/trend/volume`
+  scores.
+- **News Macro Agent** — maps macro events to correlation buckets, produces
+  `news_score` (direction-aware), and flags contradictory unconfirmed news and
+  high-impact event blackouts (→ WAIT).
+- **Portfolio Agent** — equity/PnL, gross & net exposure, used margin,
+  positions per bucket, and a continuous `portfolio_fit_score`.
+- **Social Sentiment Agent** — a deliberately weak, bounded signal (most
+  relevant for BTC) that can nudge confidence but never open a trade alone.
 - **Decision Agent** implementing the multi-confirmation scoring/decision rules.
+- **End-to-end pipeline** (`app/orchestrator.py`): Technical Analysis → Decision
+  → Risk Engine → Order Manager, with portfolio state from the simulator and an
+  audit trail. Executes simulated fills in SHADOW/BACKTEST; read-only otherwise.
+- **Backtest engine** (`backtesting/engine.py`): replays historical 1H/15m
+  candles through the pipeline, manages stop/target exits and reports metrics
+  (net PnL, win rate, profit factor, max drawdown, equity curve).
+- **Backtest CLI** (`python -m app.backtest`) with CSV loading and a `--demo`
+  mode, plus a **Daily Report Agent** that summarizes pipeline runs.
+- **Shadow runner** (`python -m app.shadow`) wires every agent into the
+  pipeline, runs all symbols read-only, and prints the daily report.
+- **J.A.R.V.I.S.-style HUD dashboard** (`dashboard/hud.py`, `--dashboard`): a
+  self-contained HTML heads-up display — arc reactor, per-symbol HUD cards,
+  risk panel, AI Director briefing and an audit ticker. No server, no deps.
+- **Optional LLM layer** — a News interpreter (text → structured `MacroEvent`s
+  feeding the deterministic News Macro Agent) and a read-only **AI Director**
+  that explains decisions and suggests (never applies) tuning. Uses
+  `claude-opus-4-8`; falls back to a deterministic offline mock with no API key.
 - **Order Manager** safety boundary (only authorized order path; sends nothing
   to the broker in this version).
 - Secure logging with secret redaction, typed models, and unit tests.
@@ -36,6 +68,27 @@ python -m app.main
 
 # Run the tests
 python -m pytest
+
+# Run a backtest on synthetic data (no broker needed)
+python -m app.backtest --demo --trade-threshold 0.5 --watchlist-threshold 0.4
+
+# Run the full shadow pipeline across all symbols (synthetic demo)
+python -m app.shadow --demo
+
+# ...with LLM news interpretation and an AI Director briefing
+# (needs ANTHROPIC_API_KEY; runs offline as a no-op without it)
+python -m app.shadow --demo --news "The FOMC held rates steady." --brief
+
+# ...persisting the audit trail to a JSONL file
+python -m app.shadow --demo --audit-file logs/audit.jsonl
+
+# ...and rendering a J.A.R.V.I.S.-style HUD dashboard (open the HTML in a browser)
+python -m app.shadow --demo --brief --dashboard dashboard_out.html
+
+# Or from CSV candle files (timestamp,open,high,low,close,volume)
+python -m app.backtest --symbol US500 \
+    --candles-1h data/local/US500_1h.csv \
+    --candles-15m data/local/US500_15m.csv
 ```
 
 ## Operating modes
@@ -53,8 +106,9 @@ impossible to enable in this version.
 
 ## Documentation
 
-See [`docs/`](docs/): project spec, architecture, risk policy, CFD spec,
-Capital.com integration and strategy spec.
+Start with the [Usage Guide](docs/USAGE.md). See [`docs/`](docs/) for the
+project spec, architecture, risk policy, CFD spec, Capital.com integration and
+strategy spec.
 
 ## Project layout
 

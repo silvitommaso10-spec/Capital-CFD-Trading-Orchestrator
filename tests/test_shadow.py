@@ -1,0 +1,126 @@
+"""Tests for the shadow-trading runner."""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+
+from agents.candles import Candle
+from agents.llm_news import LLMNewsInterpreter
+from agents.news_macro import NewsMacroAgent
+from app.ai_director import AIDirector
+from app.config import load_config, load_news_config
+from app.errors import MarketNotFoundError
+from app.llm import MockLLMClient
+from app.orchestrator import PipelineState
+from app.shadow import ShadowRunner, SyntheticDataSource
+from capital.models import Price
+
+NOW = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
+
+
+def test_synthetic_run_evaluates_all_symbols() -> None:
+    config = load_config()
+    runner = ShadowRunner(config, SyntheticDataSource(config))
+    run = runner.run(now=NOW)
+
+    symbols = [i.symbol for i in config.instruments.instruments]
+    assert len(run.results) == len(symbols)
+    assert run.report.total == len(symbols)
+    # state counts sum to the number of symbols
+    assert sum(run.report.by_state.values()) == len(symbols)
+    assert run.report.account is not None and "equity" in run.report.account
+
+
+def test_synthetic_run_executes_and_respects_bucket_limit() -> None:
+    config = load_config()
+    runner = ShadowRunner(config, SyntheticDataSource(config))
+    run = runner.run(now=NOW)
+    states = {r.symbol: r.state for r in run.results}
+
+    # US500 fills; NASDAQ shares the equity_indices bucket -> blocked.
+    assert states["US500"] is PipelineState.EXECUTED
+    assert states["NASDAQ"] is PipelineState.RISK_REJECTED
+    assert run.report.by_state["EXECUTED"] >= 1
+
+
+def test_render_contains_report_and_per_symbol() -> None:
+    config = load_config()
+    runner = ShadowRunner(config, SyntheticDataSource(config))
+    text = runner.run(now=NOW).render()
+    assert "Daily Report" in text
+    assert "Per symbol" in text
+    assert "US500" in text
+
+
+class _PartialSource:
+    """Wraps the synthetic source but fails for one symbol."""
+
+    def __init__(self, config) -> None:
+        self._inner = SyntheticDataSource(config)
+
+    def candles(self, symbol: str, timeframe: str, max_points: int) -> list[Candle]:
+        if symbol == "BTC":
+            raise MarketNotFoundError("no data for BTC")
+        return self._inner.candles(symbol, timeframe, max_points)
+
+    def price(self, symbol: str) -> Price:
+        return self._inner.price(symbol)
+
+
+def test_runner_skips_symbols_with_missing_data() -> None:
+    config = load_config()
+    runner = ShadowRunner(config, _PartialSource(config))
+    run = runner.run(now=NOW)
+    symbols = {r.symbol for r in run.results}
+    assert "BTC" not in symbols
+    assert "US500" in symbols
+
+
+# -- LLM integration -------------------------------------------------------
+
+
+def test_interpreted_news_blackout_forces_wait() -> None:
+    config = load_config()
+    news_config = load_news_config()
+    # The LLM (mocked) extracts a high-impact central-bank event -> blackout.
+    payload = json.dumps({"events": [
+        {"category": "central_bank", "sentiment": 0.0, "impact": "high",
+         "confirmed": True, "title": "FOMC decision"},
+    ]})
+    runner = ShadowRunner(
+        config, SyntheticDataSource(config),
+        news_agent=NewsMacroAgent(news_config),
+        news_interpreter=LLMNewsInterpreter(MockLLMClient(canned=payload), news_config),
+    )
+    run = runner.run(now=NOW, news_text="The FOMC announced its decision today.")
+    states = {r.symbol: r.state for r in run.results}
+
+    # central_bank affects equity_indices -> US500 waits during the blackout
+    assert states["US500"] is PipelineState.WAIT
+    # energy is unaffected by central_bank news -> USOIL still trades
+    assert states["USOIL"] is PipelineState.EXECUTED
+
+
+def test_no_news_text_means_no_events() -> None:
+    config = load_config()
+    news_config = load_news_config()
+    runner = ShadowRunner(
+        config, SyntheticDataSource(config),
+        news_agent=NewsMacroAgent(news_config),
+        news_interpreter=LLMNewsInterpreter(MockLLMClient(canned="{}"), news_config),
+    )
+    run = runner.run(now=NOW, news_text="")  # no news -> interpreter not called
+    states = {r.symbol: r.state for r in run.results}
+    assert states["US500"] is PipelineState.EXECUTED
+
+
+def test_ai_director_briefing_in_report() -> None:
+    config = load_config()
+    runner = ShadowRunner(
+        config, SyntheticDataSource(config),
+        ai_director=AIDirector(MockLLMClient(canned="All decisions look sound.")),
+    )
+    run = runner.run(now=NOW)
+    assert run.briefing == "All decisions look sound."
+    assert "AI Director" in run.render()

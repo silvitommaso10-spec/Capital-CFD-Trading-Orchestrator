@@ -19,6 +19,13 @@ class OpenPosition:
     bucket: str
     direction: Direction
     size: float
+    # Optional richer metrics (populated from the simulator/account when known).
+    notional: float = 0.0
+    margin: float = 0.0
+
+    @property
+    def signed_notional(self) -> float:
+        return self.notional if self.direction is Direction.LONG else -self.notional
 
 
 @dataclass(frozen=True)

@@ -44,10 +44,45 @@ within a small band. It can never, on its own, push a trade across the
 `TRADE_CANDIDATE` threshold or open a position — consistent with the rule that
 the Social Sentiment Agent produces a weak signal only.
 
+## Technical Analysis Agent (implemented)
+
+`agents/technical_analysis.py` produces the technical/trend/volume scores from
+1H and 15m candles:
+
+- **Trend (1H)** — EMA(20) vs EMA(50) alignment plus a minimum-strength gate
+  (separation normalized by ATR). Yields `UP`/`DOWN`/`SIDEWAYS` and a
+  `trend_score`. A directional trend is required to propose a trade.
+- **Setup (15m)** — combines EMA(9/21) alignment, price vs fast EMA, MACD
+  histogram and RSI (with overbought/oversold fading) into `technical_score`.
+- **Volume** — last bar volume vs its 20-bar average → `volume_score`.
+- **Stop/target** — ATR-based: stop at `1.5 × ATR`, target at `reward_risk ×`
+  the stop distance (default 2.0), giving an R/R that clears the risk policy's
+  1.8 minimum.
+
+Indicator primitives (SMA, EMA, RSI, MACD, ATR) live in `agents/indicators.py`.
+
+## Per-bucket strategy profiles
+
+Per-asset specialization happens through **configuration**, not duplicated
+agents. `config/strategy.yaml` defines a `default` profile and per-bucket
+overrides; `app/config.py` loads them (`StrategyConfig.for_bucket` merges a
+bucket's overrides onto the default). The Orchestrator resolves the profile for
+each symbol's bucket and passes the corresponding `TechnicalConfig` to the
+Technical Analysis Agent.
+
+| Bucket          | Notable overrides                          |
+|-----------------|--------------------------------------------|
+| equity_indices  | reward_risk 2.0                            |
+| metals          | atr_stop_mult 1.6, reward_risk 1.9         |
+| energy          | atr_stop_mult 1.8 (oil is choppy)          |
+| crypto          | atr_stop_mult 2.2, reward_risk 2.2, min_trend_strength 0.20 |
+
+This keeps one function-oriented agent set while letting each correlation
+bucket use stops, targets and trend sensitivity suited to its volatility.
+
 ## Notes for later milestones
 
-- Technical/Trend/Volume scores will be produced by the Technical Analysis and
-  Market Data agents from 1H/15m candles (EMA/RSI/MACD/ATR, S/R, breakout and
-  pullback detection).
+- The Market Data Agent will build the 1H/15m candles and data-quality flags
+  that feed the Technical Analysis Agent.
 - News score will incorporate the macro blackout windows from `config/news.yaml`.
 - Portfolio-fit score will reflect correlation/bucket exposure and used risk.
