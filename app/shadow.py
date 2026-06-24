@@ -231,6 +231,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="generate the AI Director advisory briefing")
     p.add_argument("--audit-file", dest="audit_file",
                    help="append the audit trail to this JSONL file")
+    p.add_argument("--dashboard", dest="dashboard",
+                   help="write a J.A.R.V.I.S.-style HUD dashboard to this HTML file")
     return p
 
 
@@ -285,6 +287,12 @@ def run(argv: list[str] | None = None) -> int:
     )
     report = runner.run(news_text=news_text)
     print(report.render())
+
+    if args.dashboard:
+        from dashboard.hud import write_dashboard
+
+        out = write_dashboard(report, args.dashboard)
+        logger.info("HUD dashboard written to %s", out)
     return 0
 
 

@@ -73,6 +73,13 @@ Read-only client: session/auth, account, market search, symbol mapping, market
 details, prices and price WebSocket. No trading endpoints are implemented; the
 guard methods raise `LiveTradingDisabledError`.
 
+### Dashboard (`dashboard/`)
+A J.A.R.V.I.S.-style HUD (`dashboard/hud.py`) that renders a shadow run into a
+single self-contained HTML page (dark HUD theme, animated arc reactor,
+per-symbol cards with state/score meters, a risk panel, the AI Director
+briefing and an audit ticker). No server and no external dependencies;
+generated via `python -m app.shadow --dashboard out.html`.
+
 ### Backtesting (`backtesting/`)
 Paper CFD simulator modeling fills (spread/slippage), margin and PnL, plus a
 `BacktestEngine` that replays historical 1H/15m candles through the

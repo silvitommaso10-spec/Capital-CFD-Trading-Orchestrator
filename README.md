@@ -43,6 +43,9 @@ Implemented:
   mode, plus a **Daily Report Agent** that summarizes pipeline runs.
 - **Shadow runner** (`python -m app.shadow`) wires every agent into the
   pipeline, runs all symbols read-only, and prints the daily report.
+- **J.A.R.V.I.S.-style HUD dashboard** (`dashboard/hud.py`, `--dashboard`): a
+  self-contained HTML heads-up display — arc reactor, per-symbol HUD cards,
+  risk panel, AI Director briefing and an audit ticker. No server, no deps.
 - **Optional LLM layer** — a News interpreter (text → structured `MacroEvent`s
   feeding the deterministic News Macro Agent) and a read-only **AI Director**
   that explains decisions and suggests (never applies) tuning. Uses
@@ -78,6 +81,9 @@ python -m app.shadow --demo --news "The FOMC held rates steady." --brief
 
 # ...persisting the audit trail to a JSONL file
 python -m app.shadow --demo --audit-file logs/audit.jsonl
+
+# ...and rendering a J.A.R.V.I.S.-style HUD dashboard (open the HTML in a browser)
+python -m app.shadow --demo --brief --dashboard dashboard_out.html
 
 # Or from CSV candle files (timestamp,open,high,low,close,volume)
 python -m app.backtest --symbol US500 \
