@@ -70,6 +70,29 @@ python -m app.backtest --symbol US500 \
     --candles-1h us500_1h.csv --candles-15m us500_15m.csv
 ```
 
+### Backtest every symbol at once
+
+If you exported with `--all` (files are named `{SYMBOL}_1H.csv` /
+`{SYMBOL}_15m.csv` in one directory), run all configured instruments together
+and print a side-by-side summary table:
+
+```bash
+python -m app.backtest_all --data-dir data/local
+```
+
+```
+SYMBOL   TRADES  WINS   WIN%     NET PnL    RET%     PF  MAXDD%
+---------------------------------------------------------------
+US500         1     0   0.0%      -75.98  -0.76%   0.00   0.76%
+GOLD         10     5  50.0%     +327.44  +3.27%   1.83   2.25%
+USOIL         0     0   0.0%       +0.00  +0.00%   0.00   0.00%
+---------------------------------------------------------------
+TOTAL        11                  +251.46
+```
+
+Symbols without both CSV files are skipped and listed at the end. The same
+`--trade-threshold` / `--watchlist-threshold` / `--spread` flags apply.
+
 ### Shadow run + J.A.R.V.I.S. HUD dashboard
 
 ```bash
