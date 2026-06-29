@@ -28,3 +28,11 @@ def test_write_then_load_round_trips(tmp_path) -> None:
     # timestamps preserved and ascending
     assert loaded[0].timestamp == BASE
     assert loaded[0].timestamp < loaded[1].timestamp
+
+
+def test_candle_filename() -> None:
+    from app.fetch_candles import candle_filename
+
+    assert candle_filename("US500", "1H") == "US500_1H.csv"
+    assert candle_filename("BTC", "15m") == "BTC_15m.csv"
+

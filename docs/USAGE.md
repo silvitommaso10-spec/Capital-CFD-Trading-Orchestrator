@@ -55,6 +55,9 @@ as CSV. Two ways to get them:
    ```bash
    python -m app.fetch_candles --symbol US500 --timeframe 1H  --max 400 --out us500_1h.csv
    python -m app.fetch_candles --symbol US500 --timeframe 15m --max 400 --out us500_15m.csv
+
+   # or export every symbol on 1H and 15m at once into data/local/
+   python -m app.fetch_candles --all --out-dir data/local --max 400
    ```
 
 2. **Bring your own CSV** from any source (header
