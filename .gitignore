@@ -31,6 +31,12 @@ logs/
 data/cache/
 data/local/
 
+# Shadow-run artifacts (generated locally)
+*.jsonl
+hud.html
+paper_state.json
+*.state.json
+
 # OS / editor
 .DS_Store
 .idea/

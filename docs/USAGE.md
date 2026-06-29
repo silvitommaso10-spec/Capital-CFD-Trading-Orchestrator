@@ -43,6 +43,56 @@ Prints a report: net PnL, return %, win rate, profit factor, expectancy, max
 drawdown and the trade list. Use real data with
 `--candles-1h FILE --candles-15m FILE` (CSV: `timestamp,open,high,low,close,volume`).
 
+### Backtest on real data
+
+The `--demo` data is synthetic (a clean uptrend) — good for a sanity check, not
+for real performance. For a realistic backtest you need real historical candles
+as CSV. Two ways to get them:
+
+1. **Export from Capital.com** (read-only) on a machine with network access and
+   credentials configured (see §4):
+
+   ```bash
+   python -m app.fetch_candles --symbol US500 --timeframe 1H  --max 400 --out us500_1h.csv
+   python -m app.fetch_candles --symbol US500 --timeframe 15m --max 400 --out us500_15m.csv
+
+   # or export every symbol on 1H and 15m at once into data/local/
+   python -m app.fetch_candles --all --out-dir data/local --max 400
+   ```
+
+2. **Bring your own CSV** from any source (header
+   `timestamp,open,high,low,close,volume`; timestamps ISO 8601 or epoch).
+
+Then backtest on it:
+
+```bash
+python -m app.backtest --symbol US500 \
+    --candles-1h us500_1h.csv --candles-15m us500_15m.csv
+```
+
+### Backtest every symbol at once
+
+If you exported with `--all` (files are named `{SYMBOL}_1H.csv` /
+`{SYMBOL}_15m.csv` in one directory), run all configured instruments together
+and print a side-by-side summary table:
+
+```bash
+python -m app.backtest_all --data-dir data/local
+```
+
+```
+SYMBOL   TRADES  WINS   WIN%     NET PnL    RET%     PF  MAXDD%
+---------------------------------------------------------------
+US500         1     0   0.0%      -75.98  -0.76%   0.00   0.76%
+GOLD         10     5  50.0%     +327.44  +3.27%   1.83   2.25%
+USOIL         0     0   0.0%       +0.00  +0.00%   0.00   0.00%
+---------------------------------------------------------------
+TOTAL        11                  +251.46
+```
+
+Symbols without both CSV files are skipped and listed at the end. The same
+`--trade-threshold` / `--watchlist-threshold` / `--spread` flags apply.
+
 ### Shadow run + J.A.R.V.I.S. HUD dashboard
 
 ```bash
@@ -81,6 +131,43 @@ Reads real demo data (account, prices, candles). Still no orders.
 
 `python -m app.main` loads config, opens a demo session, reads the account, and
 prints bid/offer/spread for each mapped symbol — a quick connectivity check.
+
+### Watch it over the coming days (continuous shadow loop)
+
+`--interval` turns the shadow run into a rolling session: it re-reads live demo
+data every N minutes, carries paper positions forward across cycles, and keeps
+refreshing the audit trail and HUD dashboard. Read-only throughout — no orders.
+
+```bash
+# every 15 minutes, forever (Ctrl+C to stop); append audit, refresh dashboard,
+# and persist the paper account so it survives restarts
+python -m app.shadow --interval 15 \
+    --audit-file shadow_audit.jsonl \
+    --dashboard hud.html \
+    --state-file paper_state.json
+```
+
+```bash
+# bounded: 4 cycles then stop (handy for a quick smoke test)
+python -m app.shadow --interval 15 --iterations 4
+```
+
+Leave it running on your own machine (this loop needs network access to
+Capital.com). Open `hud.html` in a browser — in loop mode the page
+**auto-refreshes itself** every cycle (no manual reload), and a `↻ AUTO-REFRESH`
+chip shows the cadence. The JSONL audit file is the full, append-only record of
+every decision.
+
+**Survives restarts.** With `--state-file`, the simulated account (open
+positions, realized PnL) is saved after every cycle and restored on the next
+start. So if you stop the process — or your machine reboots — just re-run the
+same command and the session resumes from where it left off instead of starting
+fresh at 10,000. Delete the file to start a clean session.
+
+> ⚠️ **Before running for days:** treat any API key/password you have ever
+> pasted into a chat as compromised — regenerate the Capital.com API key and
+> change the account password, and keep the new values only in your local
+> `.env` (it is gitignored).
 
 ## 5. Optional: the LLM layer
 

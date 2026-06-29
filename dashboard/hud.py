@@ -156,7 +156,12 @@ def _stat(label: str, value: str, color: str = "#25d0ff") -> str:
     )
 
 
-def render_dashboard(data: dict[str, Any], title: str = "J.A.R.V.I.S.") -> str:
+def render_dashboard(
+    data: dict[str, Any],
+    title: str = "J.A.R.V.I.S.",
+    *,
+    refresh_seconds: int | None = None,
+) -> str:
     by_state = data["by_state"]
     executed = by_state.get("EXECUTED", 0)
     rejected = by_state.get("RISK_REJECTED", 0)
@@ -179,9 +184,18 @@ def render_dashboard(data: dict[str, Any], title: str = "J.A.R.V.I.S.") -> str:
         stage = escape(str(entry.get("stage", entry.get("decision", ""))))
         audit_rows += f'<span class="tick"><b>{sym}</b> {stage}</span>'
 
+    refresh_meta = ""
+    refresh_note = ""
+    if refresh_seconds:
+        refresh_meta = f"<meta http-equiv='refresh' content='{int(refresh_seconds)}'>"
+        refresh_note = (
+            f"<span class='auto'>&#8635; AUTO&#8209;REFRESH {int(refresh_seconds)}s</span>"
+        )
+
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        f"{refresh_meta}"
         f"<title>{escape(title)} &middot; Orchestrator HUD</title>"
         f"<style>{_CSS}</style></head><body>"
         "<div class='scan'></div><div class='grid-bg'></div>"
@@ -201,6 +215,7 @@ def render_dashboard(data: dict[str, Any], title: str = "J.A.R.V.I.S.") -> str:
           <div class="clock">
             <div class="online">&#9679; SYSTEMS ONLINE</div>
             <div class="ts">{escape(data['generated_at'])}</div>
+            {refresh_note}
           </div>
         </header>
 
@@ -227,12 +242,23 @@ def render_dashboard(data: dict[str, Any], title: str = "J.A.R.V.I.S.") -> str:
     )
 
 
-def write_dashboard(run: Any, path: str | Path, title: str = "J.A.R.V.I.S.") -> Path:
+def write_dashboard(
+    run: Any,
+    path: str | Path,
+    title: str = "J.A.R.V.I.S.",
+    *,
+    refresh_seconds: int | None = None,
+) -> Path:
     """Render a shadow run to an HTML HUD file and return the path."""
 
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render_dashboard(report_to_data(run), title=title), encoding="utf-8")
+    out.write_text(
+        render_dashboard(
+            report_to_data(run), title=title, refresh_seconds=refresh_seconds
+        ),
+        encoding="utf-8",
+    )
     return out
 
 
@@ -254,6 +280,7 @@ h1{font-family:'Orbitron',sans-serif;margin:0;font-size:30px;letter-spacing:8px;
 .clock{text-align:right;font-size:12px}
 .online{color:var(--green);text-shadow:0 0 10px var(--green);letter-spacing:2px;animation:pulse 2.2s ease-in-out infinite}
 .ts{color:#6f93ad;margin-top:4px}
+.auto{display:inline-block;margin-top:5px;font-size:10px;letter-spacing:1px;color:var(--cyan);border:1px solid rgba(37,208,255,.5);border-radius:6px;padding:1px 7px;box-shadow:0 0 10px rgba(37,208,255,.2)}
 @keyframes pulse{50%{opacity:.45}}
 .reactor{position:relative;width:72px;height:72px;flex:0 0 72px}
 .reactor .ring{position:absolute;inset:0;border-radius:50%;border:2px solid transparent}

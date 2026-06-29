@@ -21,9 +21,13 @@ Examples::
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Protocol, Sequence
 
 from agents.candles import Candle
@@ -33,7 +37,7 @@ from agents.news_macro import MacroEvent, NewsMacroAgent
 from agents.social_sentiment import SocialSentimentAgent
 from app.ai_director import AIDirector
 from app.config import AppConfig, load_config, load_news_config
-from app.env import load_credentials
+from app.env import load_credentials, load_dotenv
 from app.errors import MissingCredentialsError, OrchestratorError
 from app.logging_utils import configure_logging, get_logger
 from app.modes import OperatingMode
@@ -91,6 +95,7 @@ class ShadowRunner:
         news_interpreter: LLMNewsInterpreter | None = None,
         ai_director: AIDirector | None = None,
         audit_sink: AuditSink | None = None,
+        simulator: PaperCFDSimulator | None = None,
     ) -> None:
         self._config = config
         self._source = data_source
@@ -101,7 +106,10 @@ class ShadowRunner:
         self._points_15m = points_15m
         self._news_interpreter = news_interpreter
         self._ai_director = ai_director
-        self._simulator = PaperCFDSimulator(starting_balance=starting_equity)
+        # A restored simulator carries paper positions forward across restarts.
+        self._simulator = simulator or PaperCFDSimulator(
+            starting_balance=starting_equity
+        )
         self._orchestrator = Orchestrator(
             config,
             mode=OperatingMode.SHADOW,
@@ -111,6 +119,12 @@ class ShadowRunner:
             sentiment_agent=sentiment_agent,
             audit_sink=audit_sink,
         )
+
+    @property
+    def simulator(self) -> PaperCFDSimulator:
+        """The paper account; serialise via ``.to_dict()`` to persist it."""
+
+        return self._simulator
 
     def run(
         self, now: datetime | None = None, news_text: str = ""
@@ -218,6 +232,33 @@ class SyntheticDataSource:
                      timestamp=datetime.now(timezone.utc))
 
 
+def load_simulator_state(
+    path: str, starting_equity: float
+) -> PaperCFDSimulator | None:
+    """Restore a paper account from ``path`` if it exists, else None."""
+
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    sim = PaperCFDSimulator.from_dict(data)
+    logger.info(
+        "restored paper account from %s (%d open position(s), realized=%.2f)",
+        path, len(sim.open_positions), sim.realized_pnl,
+    )
+    return sim
+
+
+def save_simulator_state(simulator: PaperCFDSimulator, path: str) -> None:
+    """Persist the paper account atomically (write to temp, then replace)."""
+
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_suffix(out.suffix + ".tmp")
+    tmp.write_text(json.dumps(simulator.to_dict(), indent=2), encoding="utf-8")
+    os.replace(tmp, out)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="python -m app.shadow", description=__doc__)
     p.add_argument("--symbols", nargs="*", help="symbols to run (default: all)")
@@ -233,11 +274,22 @@ def build_parser() -> argparse.ArgumentParser:
                    help="append the audit trail to this JSONL file")
     p.add_argument("--dashboard", dest="dashboard",
                    help="write a J.A.R.V.I.S.-style HUD dashboard to this HTML file")
+    p.add_argument("--state-file", dest="state_file",
+                   help="JSON file holding the paper account; loaded on start and "
+                        "saved after each cycle so the session survives restarts")
+    p.add_argument("--interval", type=float, default=None,
+                   help="minutes between cycles; if set, runs continuously "
+                        "(re-reads data and refreshes audit/dashboard each cycle). "
+                        "Ctrl+C to stop.")
+    p.add_argument("--iterations", type=int, default=None,
+                   help="stop after this many cycles (default: run forever "
+                        "when --interval is set)")
     return p
 
 
 def run(argv: list[str] | None = None) -> int:
     configure_logging()
+    load_dotenv()  # pick up credentials from a local .env if present
     args = build_parser().parse_args(argv)
     config = load_config()
     logger.info("Shadow run in mode=SHADOW (read-only; no orders are sent)")
@@ -274,6 +326,13 @@ def run(argv: list[str] | None = None) -> int:
         with open(args.news_file, "r", encoding="utf-8") as handle:
             news_text = handle.read()
 
+    # Restore the paper account from disk if a state file is given (and exists),
+    # so a multi-day session survives restarts.
+    restored = (
+        load_simulator_state(args.state_file, args.balance)
+        if args.state_file else None
+    )
+
     runner = ShadowRunner(
         config,
         source,
@@ -284,15 +343,48 @@ def run(argv: list[str] | None = None) -> int:
         news_interpreter=LLMNewsInterpreter(llm, news_config),
         ai_director=AIDirector(llm) if args.brief else None,
         audit_sink=JsonlAuditSink(args.audit_file) if args.audit_file else None,
+        simulator=restored,
     )
-    report = runner.run(news_text=news_text)
-    print(report.render())
 
-    if args.dashboard:
-        from dashboard.hud import write_dashboard
+    # In loop mode, make the HUD auto-refresh itself in the browser shortly
+    # after each cycle is written.
+    refresh_seconds = (
+        max(5, int(args.interval * 60)) if args.interval is not None else None
+    )
 
-        out = write_dashboard(report, args.dashboard)
-        logger.info("HUD dashboard written to %s", out)
+    def one_cycle() -> None:
+        report = runner.run(news_text=news_text)
+        print(report.render())
+        if args.state_file:
+            save_simulator_state(runner.simulator, args.state_file)
+        if args.dashboard:
+            from dashboard.hud import write_dashboard
+
+            out = write_dashboard(
+                report, args.dashboard, refresh_seconds=refresh_seconds
+            )
+            logger.info("HUD dashboard written to %s", out)
+
+    # Single pass (default).
+    if args.interval is None:
+        one_cycle()
+        return 0
+
+    # Continuous loop: the runner reuses one paper simulator, so positions
+    # carry forward across cycles — a rolling shadow session over days.
+    sleep_seconds = max(0.0, args.interval * 60.0)
+    cycle = 0
+    try:
+        while args.iterations is None or cycle < args.iterations:
+            cycle += 1
+            logger.info("--- shadow cycle %d (every %.1f min) ---",
+                        cycle, args.interval)
+            one_cycle()
+            if args.iterations is not None and cycle >= args.iterations:
+                break
+            time.sleep(sleep_seconds)
+    except KeyboardInterrupt:
+        logger.info("stopped after %d cycle(s)", cycle)
     return 0
 
 

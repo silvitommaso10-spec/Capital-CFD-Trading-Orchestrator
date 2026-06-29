@@ -56,3 +56,35 @@ def test_close_realizes_pnl_and_frees_margin() -> None:
     assert sim.used_margin() == 0.0
     assert sim.open_positions == ()
     assert math.isclose(sim.equity({}), 10_100.0)
+
+
+def test_to_dict_from_dict_round_trip() -> None:
+    sim = PaperCFDSimulator(starting_balance=10_000.0, spread=0.5)
+    sim.open_position(
+        symbol="US500", direction=Direction.LONG, size=2.0, price=5000.0,
+        contract_size=1.0, margin_factor=0.05, stop_loss=4950.0,
+        take_profit=5100.0,
+    )
+    sim.open_position(
+        symbol="GOLD", direction=Direction.SHORT, size=3.0, price=2000.0,
+        margin_factor=0.05,
+    )
+    closed = sim.open_position(
+        symbol="USOIL", direction=Direction.LONG, size=1.0, price=75.0,
+    )
+    sim.close_position(closed.position_id, 80.0)  # realize some PnL
+
+    restored = PaperCFDSimulator.from_dict(sim.to_dict())
+
+    assert math.isclose(restored.starting_balance, sim.starting_balance)
+    assert math.isclose(restored.spread, sim.spread)
+    assert math.isclose(restored.realized_pnl, sim.realized_pnl)
+    assert len(restored.open_positions) == 2
+    marks = {"US500": 5010.0, "GOLD": 1990.0}
+    assert math.isclose(restored.equity(marks), sim.equity(marks))
+    # the id counter continues without colliding with restored positions
+    new_pos = restored.open_position(
+        symbol="BTC", direction=Direction.LONG, size=1.0, price=60000.0,
+    )
+    existing_ids = {p.position_id for p in sim.open_positions}
+    assert new_pos.position_id not in existing_ids

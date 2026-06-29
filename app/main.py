@@ -17,7 +17,7 @@ from __future__ import annotations
 import sys
 
 from app.config import load_config
-from app.env import load_credentials
+from app.env import load_credentials, load_dotenv
 from app.errors import MissingCredentialsError, OrchestratorError
 from app.logging_utils import configure_logging, get_logger
 from app.modes import is_live_trading_enabled
@@ -29,6 +29,7 @@ logger = get_logger("app.main")
 
 def run() -> int:
     configure_logging()
+    load_dotenv()  # pick up credentials from a local .env if present
     config = load_config()
 
     logger.info("Starting in mode=%s (live trading enabled=%s)",

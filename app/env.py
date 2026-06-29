@@ -8,8 +8,43 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .errors import MissingCredentialsError
+
+
+def load_dotenv(path: str | Path = ".env", *, override: bool = False) -> bool:
+    """Load ``KEY=VALUE`` lines from a ``.env`` file into the process environment.
+
+    A tiny, dependency-free loader. Blank lines and ``#`` comments are ignored;
+    surrounding single/double quotes are stripped; an optional leading
+    ``export`` is allowed. Existing environment variables are preserved unless
+    ``override`` is set. Returns ``True`` if the file existed.
+
+    Secrets are loaded into the environment only — never logged or written back.
+    """
+
+    p = Path(path)
+    if not p.exists():
+        return False
+    for raw in p.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.lower().startswith("export "):
+            line = line[len("export "):].strip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if (len(value) >= 2) and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        if not key:
+            continue
+        if override or key not in os.environ:
+            os.environ[key] = value
+    return True
 
 
 @dataclass(frozen=True)
