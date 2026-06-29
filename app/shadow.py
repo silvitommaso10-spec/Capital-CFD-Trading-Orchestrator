@@ -33,7 +33,7 @@ from agents.news_macro import MacroEvent, NewsMacroAgent
 from agents.social_sentiment import SocialSentimentAgent
 from app.ai_director import AIDirector
 from app.config import AppConfig, load_config, load_news_config
-from app.env import load_credentials
+from app.env import load_credentials, load_dotenv
 from app.errors import MissingCredentialsError, OrchestratorError
 from app.logging_utils import configure_logging, get_logger
 from app.modes import OperatingMode
@@ -238,6 +238,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run(argv: list[str] | None = None) -> int:
     configure_logging()
+    load_dotenv()  # pick up credentials from a local .env if present
     args = build_parser().parse_args(argv)
     config = load_config()
     logger.info("Shadow run in mode=SHADOW (read-only; no orders are sent)")
