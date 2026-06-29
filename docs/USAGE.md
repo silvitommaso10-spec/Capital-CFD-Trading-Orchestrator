@@ -43,6 +43,30 @@ Prints a report: net PnL, return %, win rate, profit factor, expectancy, max
 drawdown and the trade list. Use real data with
 `--candles-1h FILE --candles-15m FILE` (CSV: `timestamp,open,high,low,close,volume`).
 
+### Backtest on real data
+
+The `--demo` data is synthetic (a clean uptrend) — good for a sanity check, not
+for real performance. For a realistic backtest you need real historical candles
+as CSV. Two ways to get them:
+
+1. **Export from Capital.com** (read-only) on a machine with network access and
+   credentials configured (see §4):
+
+   ```bash
+   python -m app.fetch_candles --symbol US500 --timeframe 1H  --max 400 --out us500_1h.csv
+   python -m app.fetch_candles --symbol US500 --timeframe 15m --max 400 --out us500_15m.csv
+   ```
+
+2. **Bring your own CSV** from any source (header
+   `timestamp,open,high,low,close,volume`; timestamps ISO 8601 or epoch).
+
+Then backtest on it:
+
+```bash
+python -m app.backtest --symbol US500 \
+    --candles-1h us500_1h.csv --candles-15m us500_15m.csv
+```
+
 ### Shadow run + J.A.R.V.I.S. HUD dashboard
 
 ```bash
