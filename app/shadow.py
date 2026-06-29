@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol, Sequence
@@ -233,6 +234,13 @@ def build_parser() -> argparse.ArgumentParser:
                    help="append the audit trail to this JSONL file")
     p.add_argument("--dashboard", dest="dashboard",
                    help="write a J.A.R.V.I.S.-style HUD dashboard to this HTML file")
+    p.add_argument("--interval", type=float, default=None,
+                   help="minutes between cycles; if set, runs continuously "
+                        "(re-reads data and refreshes audit/dashboard each cycle). "
+                        "Ctrl+C to stop.")
+    p.add_argument("--iterations", type=int, default=None,
+                   help="stop after this many cycles (default: run forever "
+                        "when --interval is set)")
     return p
 
 
@@ -286,14 +294,36 @@ def run(argv: list[str] | None = None) -> int:
         ai_director=AIDirector(llm) if args.brief else None,
         audit_sink=JsonlAuditSink(args.audit_file) if args.audit_file else None,
     )
-    report = runner.run(news_text=news_text)
-    print(report.render())
 
-    if args.dashboard:
-        from dashboard.hud import write_dashboard
+    def one_cycle() -> None:
+        report = runner.run(news_text=news_text)
+        print(report.render())
+        if args.dashboard:
+            from dashboard.hud import write_dashboard
 
-        out = write_dashboard(report, args.dashboard)
-        logger.info("HUD dashboard written to %s", out)
+            out = write_dashboard(report, args.dashboard)
+            logger.info("HUD dashboard written to %s", out)
+
+    # Single pass (default).
+    if args.interval is None:
+        one_cycle()
+        return 0
+
+    # Continuous loop: the runner reuses one paper simulator, so positions
+    # carry forward across cycles — a rolling shadow session over days.
+    sleep_seconds = max(0.0, args.interval * 60.0)
+    cycle = 0
+    try:
+        while args.iterations is None or cycle < args.iterations:
+            cycle += 1
+            logger.info("--- shadow cycle %d (every %.1f min) ---",
+                        cycle, args.interval)
+            one_cycle()
+            if args.iterations is not None and cycle >= args.iterations:
+                break
+            time.sleep(sleep_seconds)
+    except KeyboardInterrupt:
+        logger.info("stopped after %d cycle(s)", cycle)
     return 0
 
 

@@ -13,6 +13,7 @@ from app.config import load_config, load_news_config
 from app.errors import MarketNotFoundError
 from app.llm import MockLLMClient
 from app.orchestrator import PipelineState
+from app import shadow as shadow_cli
 from app.shadow import ShadowRunner, SyntheticDataSource
 from capital.models import Price
 
@@ -124,3 +125,19 @@ def test_ai_director_briefing_in_report() -> None:
     run = runner.run(now=NOW)
     assert run.briefing == "All decisions look sound."
     assert "AI Director" in run.render()
+
+
+def test_cli_loop_runs_multiple_cycles(tmp_path, capsys) -> None:
+    audit = tmp_path / "audit.jsonl"
+    dash = tmp_path / "hud.html"
+    rc = shadow_cli.run([
+        "--demo", "--interval", "0", "--iterations", "2",
+        "--audit-file", str(audit), "--dashboard", str(dash),
+    ])
+    assert rc == 0
+    # Both cycles ran and each produced per-symbol output.
+    out = capsys.readouterr().out
+    assert out.count("Per symbol") == 2
+    # Dashboard refreshed and audit trail appended across cycles.
+    assert dash.exists()
+    assert audit.exists() and audit.read_text(encoding="utf-8").strip()

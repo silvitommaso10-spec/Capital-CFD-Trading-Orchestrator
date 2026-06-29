@@ -132,6 +132,32 @@ Reads real demo data (account, prices, candles). Still no orders.
 `python -m app.main` loads config, opens a demo session, reads the account, and
 prints bid/offer/spread for each mapped symbol — a quick connectivity check.
 
+### Watch it over the coming days (continuous shadow loop)
+
+`--interval` turns the shadow run into a rolling session: it re-reads live demo
+data every N minutes, carries paper positions forward across cycles, and keeps
+refreshing the audit trail and HUD dashboard. Read-only throughout — no orders.
+
+```bash
+# every 15 minutes, forever (Ctrl+C to stop); append audit + refresh dashboard
+python -m app.shadow --interval 15 \
+    --audit-file shadow_audit.jsonl --dashboard hud.html
+```
+
+```bash
+# bounded: 4 cycles then stop (handy for a quick smoke test)
+python -m app.shadow --interval 15 --iterations 4
+```
+
+Leave it running on your own machine (this loop needs network access to
+Capital.com). Open `hud.html` in a browser and refresh to watch it evolve; the
+JSONL audit file is the full, append-only record of every decision.
+
+> ⚠️ **Before running for days:** treat any API key/password you have ever
+> pasted into a chat as compromised — regenerate the Capital.com API key and
+> change the account password, and keep the new values only in your local
+> `.env` (it is gitignored).
+
 ## 5. Optional: the LLM layer
 
 Adds two optional, read-only capabilities (model `claude-opus-4-8`):
