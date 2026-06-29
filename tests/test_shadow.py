@@ -14,7 +14,12 @@ from app.errors import MarketNotFoundError
 from app.llm import MockLLMClient
 from app.orchestrator import PipelineState
 from app import shadow as shadow_cli
-from app.shadow import ShadowRunner, SyntheticDataSource
+from app.shadow import (
+    ShadowRunner,
+    SyntheticDataSource,
+    load_simulator_state,
+)
+from backtesting.paper_simulator import PaperCFDSimulator
 from capital.models import Price
 
 NOW = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
@@ -141,3 +146,37 @@ def test_cli_loop_runs_multiple_cycles(tmp_path, capsys) -> None:
     # Dashboard refreshed and audit trail appended across cycles.
     assert dash.exists()
     assert audit.exists() and audit.read_text(encoding="utf-8").strip()
+    # Loop mode embeds a browser auto-refresh in the HUD.
+    assert "http-equiv='refresh'" in dash.read_text(encoding="utf-8")
+
+
+def test_cli_single_run_has_no_auto_refresh(tmp_path) -> None:
+    dash = tmp_path / "hud.html"
+    rc = shadow_cli.run(["--demo", "--dashboard", str(dash)])
+    assert rc == 0
+    assert "http-equiv='refresh'" not in dash.read_text(encoding="utf-8")
+
+
+def test_cli_state_file_persists_positions_across_restarts(tmp_path) -> None:
+    state = tmp_path / "paper.json"
+
+    # First process: opens paper positions and saves the account.
+    rc = shadow_cli.run([
+        "--demo", "--interval", "0", "--iterations", "1",
+        "--state-file", str(state),
+    ])
+    assert rc == 0
+    assert state.exists()
+    sim_before = PaperCFDSimulator.from_dict(json.loads(state.read_text()))
+    assert len(sim_before.open_positions) >= 1
+
+    # Second process: restores the account; positions carry forward, so the
+    # same symbols are now rejected as already-open instead of re-executed.
+    runner = ShadowRunner(
+        load_config(),
+        SyntheticDataSource(load_config()),
+        simulator=load_simulator_state(str(state), 10_000.0),
+    )
+    run = runner.run(now=NOW)
+    states = {r.symbol: r.state for r in run.results}
+    assert states["US500"] is PipelineState.RISK_REJECTED

@@ -7,8 +7,8 @@ realized/unrealized PnL, and never touches the broker.
 
 from __future__ import annotations
 
-import itertools
 from dataclasses import dataclass, field
+from typing import Any
 
 from risk.models import Direction
 
@@ -39,6 +39,33 @@ class SimulatedPosition:
             diff = -diff
         return diff * self.size * self.contract_size
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "position_id": self.position_id,
+            "symbol": self.symbol,
+            "direction": self.direction.value,
+            "size": self.size,
+            "entry_price": self.entry_price,
+            "contract_size": self.contract_size,
+            "margin_factor": self.margin_factor,
+            "stop_loss": self.stop_loss,
+            "take_profit": self.take_profit,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "SimulatedPosition":
+        return cls(
+            position_id=int(data["position_id"]),
+            symbol=str(data["symbol"]),
+            direction=Direction(data["direction"]),
+            size=float(data["size"]),
+            entry_price=float(data["entry_price"]),
+            contract_size=float(data["contract_size"]),
+            margin_factor=float(data["margin_factor"]),
+            stop_loss=data.get("stop_loss"),
+            take_profit=data.get("take_profit"),
+        )
+
 
 @dataclass
 class PaperCFDSimulator:
@@ -48,9 +75,7 @@ class PaperCFDSimulator:
     spread: float = 0.0
     realized_pnl: float = 0.0
     _positions: dict[int, SimulatedPosition] = field(default_factory=dict)
-    _ids: "itertools.count[int]" = field(
-        default_factory=lambda: itertools.count(1)
-    )
+    _next_id: int = 1
 
     @property
     def open_positions(self) -> tuple[SimulatedPosition, ...]:
@@ -89,8 +114,10 @@ class PaperCFDSimulator:
             raise ValueError("size must be positive")
         half_spread = self.spread / 2.0
         fill = price + half_spread if direction is Direction.LONG else price - half_spread
+        position_id = self._next_id
+        self._next_id += 1
         position = SimulatedPosition(
-            position_id=next(self._ids),
+            position_id=position_id,
             symbol=symbol,
             direction=direction,
             size=size,
@@ -116,3 +143,34 @@ class PaperCFDSimulator:
         pnl = position.unrealized_pnl(exit_price)
         self.realized_pnl += pnl
         return pnl
+
+    # -- persistence -------------------------------------------------------
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise the full account state (JSON-friendly)."""
+
+        return {
+            "starting_balance": self.starting_balance,
+            "spread": self.spread,
+            "realized_pnl": self.realized_pnl,
+            "next_id": self._next_id,
+            "positions": [p.to_dict() for p in self._positions.values()],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "PaperCFDSimulator":
+        """Reconstruct a simulator from :meth:`to_dict` output."""
+
+        sim = cls(
+            starting_balance=float(data["starting_balance"]),
+            spread=float(data.get("spread", 0.0)),
+            realized_pnl=float(data.get("realized_pnl", 0.0)),
+        )
+        positions = [
+            SimulatedPosition.from_dict(p) for p in data.get("positions", [])
+        ]
+        sim._positions = {p.position_id: p for p in positions}
+        sim._next_id = int(
+            data.get("next_id", max((p.position_id for p in positions), default=0) + 1)
+        )
+        return sim
